@@ -6,7 +6,7 @@ from collections import defaultdict
 def main():    
 
     if len(sys.argv) < 2:
-        raise ValueError('Must supply data root directory');
+        raise ValueError('Must supply data directory (root of cajun result file tree)');
 
     root = sys.argv[1]
     
