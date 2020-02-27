@@ -1,16 +1,23 @@
-import pandas as pd
-import numpy as np
+import sys
 import os
 import glob
-import csv
 from collections import defaultdict
 
 def main():    
 
-    root = '/data/cajun_results/cajun-complete/'  # on doppler
-    
-    meta_file_folder = f'{root}/file_lists/'
+    if len(sys.argv) < 2:
+        raise ValueError('Must supply data root directory');
 
+    root = sys.argv[1]
+    
+    if not os.path.exists(root):
+        raise FileNotFoundError(f'Path {root} does not exist');
+
+    # Change to root directory and then make everything relative 
+    os.chdir(root)
+
+    meta_file_folder = f'file_lists'
+    
     station_lists = defaultdict(list)
     year_lists = defaultdict(list)
     station_year_lists = defaultdict(list)
@@ -18,14 +25,13 @@ def main():
         for month in range(1,13):
             for day in range(1,32):
 
-                datestr = f'{year}/{month:02d}/{day:02d}'
-                datestr_folder = f'{root}/{datestr}/'
+                datestr_folder = f'{year}/{month:02d}/{day:02d}'
                 if os.path.exists(datestr_folder):  # make sure this month/day exists in this year
-                    print(datestr)
+                    print(datestr_folder)
                     
-                    for datestr_station_folder in glob.glob(datestr_folder+'*/'):
-                        station = datestr_station_folder.split('/')[-2]
-                        print(f'\t{station} ({datestr})')
+                    for datestr_station_folder in glob.glob(f'{datestr_folder}/*'):
+                        station = datestr_station_folder.split('/')[-1]
+                        print(f'\t{station} ({datestr_folder})')
                         
                         for scan_file in sorted(glob.glob(f'{datestr_station_folder}/*.csv')):
                             station_lists[station].append(scan_file)
