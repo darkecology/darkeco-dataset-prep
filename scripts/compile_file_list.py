@@ -3,15 +3,16 @@ import os
 import glob
 from collections import defaultdict
 
-def main():    
+
+def main():
 
     if len(sys.argv) < 2:
-        raise ValueError('Must supply data directory (root of cajun result file tree)');
+        raise ValueError('Must supply data directory (root of cajun result file tree)')
 
     root = sys.argv[1]
     
     if not os.path.exists(root):
-        raise FileNotFoundError(f'Path {root} does not exist');
+        raise FileNotFoundError(f'Path {root} does not exist')
 
     # Change to root directory and then make everything relative 
     os.chdir(root)
@@ -22,8 +23,8 @@ def main():
     year_lists = defaultdict(list)
     station_year_lists = defaultdict(list)
     for year in range(1995, 2020):
-        for month in range(1,13):
-            for day in range(1,32):
+        for month in range(1, 13):
+            for day in range(1, 32):
 
                 datestr_folder = f'{year}/{month:02d}/{day:02d}'
                 if os.path.exists(datestr_folder):  # make sure this month/day exists in this year

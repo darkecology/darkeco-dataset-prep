@@ -3,25 +3,22 @@ import numpy as np
 import sys
 import os
 import glob
-import csv
-from collections import defaultdict
 from nexrad import get_lat_lon
 
-def main(): 
 
-    years = [2017, 2018]   
+def main():
+    years = [2017, 2018]
 
-    #root = '/data/cajun_results/cajun-complete'  # on doppler
     if len(sys.argv) < 2:
-        raise ValueError('Must supply root directory for data)');
+        raise ValueError('Must supply root directory for data)')
 
     root = sys.argv[1]
-    
+
     if not os.path.exists(root):
-        raise FileNotFoundError(f'Path {root} does not exist');
+        raise FileNotFoundError(f'Path {root} does not exist')
 
     os.chdir(root)
-    
+
     meta_file_folder = f'{root}/summary_folder'
     file_list_folder = f'{root}/file_lists/station_year_lists'
 
@@ -39,43 +36,43 @@ def main():
 
             with open(file_list_path, 'r') as infile:
                 file_paths = infile.read().split('\n')
-            
+
             station_year = file_list_path.split('/')[-1].split('.')[0]
 
             print(station_year)
             with open(f'{meta_file_folder}/{station_year}.csv', 'w', newline='') as outfile:
-          
-                outfile.write('station,lat,lon,date,time,total_reflectivity_bio,total_reflectivity_unfiltered,avg_u,avg_v,avg_speed,avg_track,total_percent_rain\n')
-        
+
+                outfile.write('station,lat,lon,date,time,total_reflectivity_bio,total_reflectivity_unfiltered,avg_u,'
+                              'avg_v,avg_speed,avg_track,total_percent_rain\n')
+
                 for file_path in file_paths:
                     outfile.write(extract_scan_meta_data(file_path, lat_lon) + '\n')
 
 
 def extract_scan_meta_data(infile, lat_lon):
-
     scan = pd.read_csv(infile)
 
     infile = infile.split('/')[-1]
-    
+
     station = infile[:4]
-    year    = infile[4:8]
-    month   = infile[8:10]
-    day     = infile[10:12]
-    hour    = infile[13:15]
-    minute  = infile[15:17]
-    second  = infile[17:19]
+    year = infile[4:8]
+    month = infile[8:10]
+    day = infile[10:12]
+    hour = infile[13:15]
+    minute = infile[15:17]
+    second = infile[17:19]
 
     date = f'{year}-{month}-{day}'
     time = f'{hour}:{minute}:{second}'
-    
+
     bin_widths = np.diff(scan['bin_lower'])
     if np.all(bin_widths == bin_widths[0]):
-        bin_width = bin_widths[0] # bin width in meters
+        bin_width = bin_widths[0]  # bin width in meters
     else:
         raise ValueError('Bin vertical widths are not consistent!')
 
-    bin_width_km = bin_width / 1000 # bin width in km
-    
+    bin_width_km = bin_width / 1000  # bin width in km
+
     # Total reflectivity (vertically integrated density)
     #
     #  -- units in each elevation bin are reflectivity (cm^2/km^3)
@@ -110,16 +107,19 @@ def extract_scan_meta_data(infile, lat_lon):
     # TODO: double check calculation
     total_percent_rain = sum(scan['percent_rain'] * scan['nbins']) / sum(scan['nbins'])
 
-    row = f'{station},{lat_lon[station]["lat"]},{lat_lon[station]["lon"]},{date},{time},{total_reflectivity_bio:.4f},{total_reflectivity_unfiltered:.4f},{avg_u:.4f},{avg_v:.4f},{avg_speed:.4f},{avg_track:.4f},{total_percent_rain}'
+    row = f'{station},{lat_lon[station]["lat"]},{lat_lon[station]["lon"]},' \
+        f'{date},{time},{total_reflectivity_bio:.4f},{total_reflectivity_unfiltered:.4f},' \
+        f'{avg_u:.4f},{avg_v:.4f},{avg_speed:.4f},{avg_track:.4f},{total_percent_rain} '
 
     return row
 
-def wtd_mean( w, x ):
+
+def wtd_mean(w, x):
     return sum(w * x) / sum(w)
 
 
-def pol2cmp( theta ):
-    '''Convert from mathematical angle to compass bearing
+def pol2cmp(theta):
+    """Convert from mathematical angle to compass bearing
 
     Parameters
     ----------
@@ -134,14 +134,14 @@ def pol2cmp( theta ):
     See Also
     --------
     cmp2pol
-    '''
-    bearing = np.rad2deg(np.pi/2 - theta)
+    """
+    bearing = np.rad2deg(np.pi / 2 - theta)
     bearing = np.mod(bearing, 360)
     return bearing
 
-    
+
 if __name__ == '__main__':
-    import time
-    start = time.time()
+    import time as t
+    start = t.time()
     main()
-    print(f'Total time: {time.time() - start}')
+    print(f'Total time: {t.time() - start}')
