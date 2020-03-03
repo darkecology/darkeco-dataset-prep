@@ -4,10 +4,12 @@ import sys
 import os
 import glob
 from nexrad import get_lat_lon
+import pvlib
+import time as t
 
 
 def main():
-    years = [2017, 2018]
+    years = [2016, 2017, 2018]
 
     if len(sys.argv) < 2:
         raise ValueError('Must supply root directory for data)')
@@ -27,6 +29,9 @@ def main():
 
     lat_lon = get_lat_lon()
 
+    # TODO: could potentially be sped up by loading many profiles at once and using pandas commands, including
+    # TODO: group by to group by scan
+
     for year in years:
 
         file_list_paths = glob.glob(f'{file_list_folder}/*.txt')  # why doesn't f'{file_list_folder}/*-{year}.txt' work?
@@ -40,13 +45,36 @@ def main():
             station_year = file_list_path.split('/')[-1].split('.')[0]
 
             print(station_year)
-            with open(f'{meta_file_folder}/{station_year}.csv', 'w', newline='') as outfile:
+            start = t.time()
+            outfile = f'{meta_file_folder}/{station_year}.csv'
 
-                outfile.write('station,lat,lon,date,time,total_reflectivity_bio,total_reflectivity_unfiltered,avg_u,'
-                              'avg_v,avg_speed,avg_track,total_percent_rain\n')
+            column_names = ['station', 'lat', 'lon', 'date',                            # 0-3
+                            'total_reflectivity_bio', 'total_reflectivity_unfiltered',  # 4-5
+                            'avg_u', 'avg_v', 'avg_speed', 'avg_track',                 # 6-9
+                            'total_percent_rain']                                       # 10
 
-                for file_path in file_paths:
-                    outfile.write(extract_scan_meta_data(file_path, lat_lon) + '\n')
+            # Get rows from individual files
+            rows = [extract_scan_meta_data(f, lat_lon) for f in file_paths]
+
+            # Create data frame
+            df = pd.DataFrame(rows, columns=column_names)
+
+            # Add solar elevation (note: much faster to do in batch at end than row-by-row)
+            solar_elev = pvlib.solarposition.spa_python(df['date'], df['lat'], df['lon'])
+            df['solar_elevation'] = solar_elev['elevation'].values
+
+            # Convert lat/lon to strings to preserve full precision --- other floats will be truncated
+            df['lat'] = df['lat'].apply(str)
+            df['lon'] = df['lon'].apply(str)
+
+            # Add solar elevation into column names and write to file
+            column_names.insert(4, 'solar_elevation')
+            df.to_csv(outfile, columns=column_names, index=False, float_format='%.4f')
+
+            n_scans = len(rows)
+
+            elapsed = t.time()-start
+            print(f'  time={elapsed:.2f}, scans={n_scans}, per scan={elapsed/n_scans:.4f}')
 
 
 def extract_scan_meta_data(infile, lat_lon):
@@ -62,8 +90,7 @@ def extract_scan_meta_data(infile, lat_lon):
     minute = infile[15:17]
     second = infile[17:19]
 
-    date = f'{year}-{month}-{day}'
-    time = f'{hour}:{minute}:{second}'
+    date = f'{year}-{month}-{day} {hour}:{minute}:{second}Z'
 
     bin_widths = np.diff(scan['bin_lower'])
     if np.all(bin_widths == bin_widths[0]):
@@ -107,9 +134,11 @@ def extract_scan_meta_data(infile, lat_lon):
     # TODO: double check calculation
     total_percent_rain = sum(scan['percent_rain'] * scan['nbins']) / sum(scan['nbins'])
 
-    row = f'{station},{lat_lon[station]["lat"]},{lat_lon[station]["lon"]},' \
-        f'{date},{time},{total_reflectivity_bio:.4f},{total_reflectivity_unfiltered:.4f},' \
-        f'{avg_u:.4f},{avg_v:.4f},{avg_speed:.4f},{avg_track:.4f},{total_percent_rain} '
+    lat = lat_lon[station]["lat"]
+    lon = lat_lon[station]["lon"]
+
+    row = [station, lat, lon, date, total_reflectivity_bio, total_reflectivity_unfiltered,
+           avg_u, avg_v, avg_speed, avg_track, total_percent_rain]
 
     return row
 
@@ -141,7 +170,4 @@ def pol2cmp(theta):
 
 
 if __name__ == '__main__':
-    import time as t
-    start = t.time()
     main()
-    print(f'Total time: {t.time() - start}')
