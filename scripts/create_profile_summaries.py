@@ -60,7 +60,7 @@ def main():
             df = pd.DataFrame(rows, columns=column_names)
 
             # Add solar elevation (note: much faster to do in batch at end than row-by-row)
-            solar_elev = pvlib.solarposition.spa_python(df['date'], df['lat'], df['lon'])
+            solar_elev = pvlib.get_solarposition(df['date'], df['lat'], df['lon'])
             df['solar_elevation'] = solar_elev['elevation'].values
 
             # Convert lat/lon to strings to preserve full precision --- other floats will be truncated
