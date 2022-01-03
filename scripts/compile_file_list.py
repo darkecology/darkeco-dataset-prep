@@ -26,7 +26,7 @@ def main():
         for month in range(1, 13):
             for day in range(1, 32):
 
-                datestr_folder = f'{year}/{month:02d}/{day:02d}'
+                datestr_folder = f'profiles/{year}/{month:02d}/{day:02d}'
                 if os.path.exists(datestr_folder):  # make sure this month/day exists in this year
                     print(datestr_folder)
                     
