@@ -6,7 +6,12 @@ import nexrad
 import functools
 
 
-def summarize_profile(infile, lat_lon):
+'''
+Summarize vertical profiles across height dimension and aggregate to 
+one row per scan
+'''
+def aggregate_profile_to_scan_level(infile, lat_lon):
+
     '''Produce scan-level summary for a vertical profile'''
     scan = pd.read_csv(infile)
 
@@ -98,52 +103,11 @@ def summarize_profile(infile, lat_lon):
     return row
 
 
-def wtd_mean(w, x):
-    """Compute weighted mean of two pandas Series
-    """
-    valid = ~(np.isnan(w) | np.isnan(x))
-    tot = np.sum(w[valid])
-    if tot == 0:
-        return np.nan
-    else:
-        return np.sum(w[valid] * x[valid]) / tot
-
-
-def pol2cmp(theta):
-    """Convert from mathematical angle to compass bearing
-
-    Parameters
-    ----------
-    theta: array-like
-        angle in radians counter-clockwise from positive x-axis
-
-    Returns
-    -------
-    bearing: array-like
-        angle in degrees clockwise from north
-
-    See Also
-    --------
-    cmp2pol
-    """
-    bearing = np.rad2deg(np.pi / 2 - theta)
-    bearing = np.mod(bearing, 360)
-    return bearing
-
-
-def resample(data, index, limit=1, limit_direction='both'):
-    '''Resample data frame with given index'''
-    
-    index_all = index.union(data.index)
-
-    return data.reindex(index_all) \
-               .interpolate(method='time', 
-                            limit=limit,
-                            limit_direction=limit_direction) \
-               .reindex(index)
-
+'''
+Load one station-year scan-level time series
+'''
 @functools.lru_cache(maxsize=32)
-def load_data(root, station, year):
+def load_station_year(root, station, year):
     '''Load scan-level data for given (station, year)'''
     
     file = f'{root}/scan_level/{station}-{year}.csv'
@@ -160,15 +124,33 @@ def load_data(root, station, year):
         return None
 
 
+'''
+Custom resampling method for pandas series
+'''
+def resample(data, index, limit=1, limit_direction='both'):
+    '''Resample data frame with given index'''
+    
+    index_all = index.union(data.index)
+
+    return data.reindex(index_all) \
+               .interpolate(method='time', 
+                            limit=limit,
+                            limit_direction=limit_direction) \
+               .reindex(index)
+
+
+'''
+Load and resample one station-year scan-level time series to a regular time interval
+'''
 #@functools.lru_cache(maxsize=32)
-def load_and_resample_data(root, station, year,
-                           trim=True,
-                           freq='5Min',
-                           limit=12,
-                           limit_direction='both'):
+def load_and_resample_station_year(root, station, year,
+                                   trim=True,
+                                   freq='5Min',
+                                   limit=12,
+                                   limit_direction='both'):
     '''Load scan-level data for (station, year) and resample to fixed times'''
 
-    data = load_data(root, station, year)
+    data = load_station_year(root, station, year)
     
     if trim:
         # Trim to days that exist in data
@@ -178,7 +160,7 @@ def load_and_resample_data(root, station, year,
         # Use whole year
         start = pd.Timestamp(year=year, month=1, day=1)
         end =  pd.Timestamp(year=year+1, month=1, day=1)
-    
+
     index = pd.date_range(start, end, freq=freq, tz='UTC')
     
     # First resample with limit=2 and record missing entries
@@ -201,6 +183,139 @@ def load_and_resample_data(root, station, year,
     
     return data, resampled_data
     
+
+'''
+Aggregate resampled station-year time series to daily level
+'''
+def aggregate_single_station_year_to_daily(root, station, year, freq='5min'):
+
+    time_step_in_hours = pd.Timedelta(freq) / pd.Timedelta('1h')
+    
+    integrate_fields = [
+        # <input column name>, <output column name>
+        ['density', 'density_hours'],
+        ['density_precip', 'density_hours_precip'],
+        ['traffic_rate', 'traffic'],
+        ['traffic_rate_precip', 'traffic_precip']
+    ]
+
+    weighted_average_fields = [ 
+        # <column name>, <weight column name>
+        ['u', 'density'],
+        ['v', 'density'],
+        ['direction', 'density'],
+        ['speed', 'density']
+    ]
+
+    average_fields = [ 
+        # Row format: <column name>
+        'percent_rain'
+    ]
+
+    copy_fields = [
+        'date'
+    ]
+
+    last_df = None
+    df = None
+    next_df = None
+
+    NEXRAD_LOCATIONS = nexrad.get_lat_lon()    
+    lon = NEXRAD_LOCATIONS[station]['lon']
+    lat = NEXRAD_LOCATIONS[station]['lat']
+
+    # Load data frames as needed (methods are memoized to avoid duplicate work)
+    df, df_resampled = load_and_resample_station_year(root, station, year, freq=freq)
+    last_df, last_df_resampled = load_and_resample_station_year(root, station, year-1, freq=freq)
+    next_df, next_df_resampled = load_and_resample_station_year(root, station, year+1, freq=freq)
+
+    # Convenience variables with lists of all relevant dfs
+    dfs = [last_df, df, next_df]
+    dfs_resampled = [last_df_resampled, df_resampled, next_df_resampled]
+
+    # Initialize daily data        
+    day_info = get_day_info(station, year)
+
+    # Specify time periods of interest
+    time_periods = [
+        {
+            'name': 'day',
+            'start': 'sunrise', 
+            'end': 'sunset'
+        },
+        {
+            'name': 'night',
+            'start': 'sunset',
+            'end': 'next_sunrise'
+        }
+    ]
+
+    write_dfs = []
+
+    # Iterate over periods (night, day)
+    for period in time_periods:
+
+        print(f'Processing {period["name"]} data')
+
+        write_df = pd.DataFrame(index=day_info.index)
+        write_dfs.append(write_df)
+
+        write_df['station'] = station
+        write_df['lat'] = lat
+        write_df['lon'] = lon
+        
+        for field in copy_fields:
+            write_df[field] = day_info[field]
+
+        write_df['period'] = period['name']
+
+        # Iterate over days of year
+        for day, row in day_info.iterrows():
+
+            start = row[period['start']]
+            end = row[period['end']]
+
+            length = (end - start) / pd.Timedelta(1, 'h')
+            write_df.loc[day, 'period_length'] = length
+
+            rows = get_rows(dfs, start, end)
+            rows_resampled = get_rows(dfs_resampled, start, end) 
+
+            # Skip if all missing (includes case when there are no rows at all)
+            if rows_resampled['density'].isna().all():
+                continue
+            
+            # Add diagnostics fields
+            n_rows = len(rows_resampled)
+            percent_missing = np.sum(np.isnan(rows_resampled['density'])) / n_rows
+            percent_filled = np.sum(rows_resampled['filled']) / n_rows
+
+            write_df.loc[day, 'percent_missing'] = percent_missing
+            write_df.loc[day, 'percent_filled'] = percent_filled
+
+            # Perform integration on specified fields
+            for spec in integrate_fields:
+                input_column, output_column = spec                    
+                write_df.loc[day, output_column] = rows_resampled[input_column].sum() * time_step_in_hours
+
+            # Perform weighted average on specified fields    
+            for spec in weighted_average_fields:
+                data_column, weight_column = spec
+                weights = rows_resampled[weight_column]
+                vals = rows_resampled[data_column]
+                write_df.loc[day, data_column] = wtd_mean(weights, vals)
+
+            # Perform simple average on specified fields
+            for column in average_fields:
+                write_df.loc[day, column] = rows[column].mean(skipna=True)
+
+    out_df = pd.concat(write_dfs)
+    return out_df
+
+
+'''
+Helper function for daily aggregation. Get a data frame describing each day of the year.
+'''
 def get_day_info(station, year):
     
     NEXRAD_LOCATIONS = nexrad.get_lat_lon()
@@ -237,6 +352,44 @@ def get_day_info(station, year):
     return day_info
 
 
+
+'''
+Utilities
+'''
+
+def wtd_mean(w, x):
+    """Compute weighted mean of two pandas Series
+    """
+    valid = ~(np.isnan(w) | np.isnan(x))
+    tot = np.sum(w[valid])
+    if tot == 0:
+        return np.nan
+    else:
+        return np.sum(w[valid] * x[valid]) / tot
+
+
+def pol2cmp(theta):
+    """Convert from mathematical angle to compass bearing
+
+    Parameters
+    ----------
+    theta: array-like
+        angle in radians counter-clockwise from positive x-axis
+
+    Returns
+    -------
+    bearing: array-like
+        angle in degrees clockwise from north
+
+    See Also
+    --------
+    cmp2pol
+    """
+    bearing = np.rad2deg(np.pi / 2 - theta)
+    bearing = np.mod(bearing, 360)
+    return bearing
+
+
 def get_rows(dfs, start, end):
     '''
     Get rows from df with index value between start and end from list
@@ -255,9 +408,9 @@ def test_get_rows(root):
     station = 'KBOX'
     year = 2017
     
-    last_df = load_data(root, station, year-1)
-    df = load_data(root, station, year)
-    next_df = load_data(root, station, year+1)
+    last_df = load_station_year(root, station, year-1)
+    df = load_station_year(root, station, year)
+    next_df = load_station_year(root, station, year+1)
     
     # Get rows spanning last_df and df
     start = pd.Timestamp('2016-12-31 20:00:00Z')
