@@ -27,13 +27,13 @@ def main():
 
     resample_frequency = '5min'
     
-    if 'scan' in actions or actions=='all':
+    if 'scan' in actions or 'all' in actions: # True if actions is either 'all' or ['all']
         aggregate_station_years_by_scan(args.root, args.stations, args.years, args.max_scans)
 
-    if 'resample' in actions or actions=='all':
+    if 'resample' in actions or 'all' in actions:
         resample_station_years(args.root, args.stations, args.years, freq=resample_frequency)
 
-    if 'daily' in actions or actions=='all':
+    if 'daily' in actions or 'all' in actions:
         aggregate_station_years_to_daily(args.root, args.stations, args.years, freq=resample_frequency)
 
 
@@ -128,7 +128,7 @@ def resample_station_years(root, stations, years, freq="5min"):
 
     for station in stations:
         for year in years:
-            df, resampled_df = util.load_and_resample_station_year(root, station, year)
+            resampled_df = util.load_and_resample_station_year(root, station, year)
 
             resampled_df.insert(3, 'date', resampled_df.index)
             

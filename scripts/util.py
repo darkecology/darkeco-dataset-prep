@@ -107,10 +107,13 @@ def aggregate_profile_to_scan_level(infile, lat_lon):
 Load one station-year scan-level time series
 '''
 @functools.lru_cache(maxsize=32)
-def load_station_year(root, station, year):
+def load_station_year(root, station, year, resampled=False):
     '''Load scan-level data for given (station, year)'''
     
-    file = f'{root}/scan_level/{station}-{year}.csv'
+    if resampled:
+        file = f'{root}/resampled/{station}_{year}.csv'
+    else:
+        file = f'{root}/scan_level/{station}-{year}.csv'
 
     print(f'Loading {file}')
     
@@ -181,7 +184,7 @@ def load_and_resample_station_year(root, station, year,
 
     resampled_data['station'] = station
     
-    return data, resampled_data
+    return resampled_data
     
 
 '''
@@ -224,14 +227,13 @@ def aggregate_single_station_year_to_daily(root, station, year, freq='5min'):
     lon = NEXRAD_LOCATIONS[station]['lon']
     lat = NEXRAD_LOCATIONS[station]['lat']
 
-    # Load data frames as needed (methods are memoized to avoid duplicate work)
-    df, df_resampled = load_and_resample_station_year(root, station, year, freq=freq)
-    last_df, last_df_resampled = load_and_resample_station_year(root, station, year-1, freq=freq)
-    next_df, next_df_resampled = load_and_resample_station_year(root, station, year+1, freq=freq)
+    # Load data frames as needed (methods are memoized to avoid duplicate work)        
+    df = load_station_year(root, station, year, resampled=True)
+    last_df = load_station_year(root, station, year-1, resampled=True)
+    next_df = load_station_year(root, station, year+1, resampled=True)
 
     # Convenience variables with lists of all relevant dfs
     dfs = [last_df, df, next_df]
-    dfs_resampled = [last_df_resampled, df_resampled, next_df_resampled]
 
     # Initialize daily data        
     day_info = get_day_info(station, year)
@@ -279,16 +281,15 @@ def aggregate_single_station_year_to_daily(root, station, year, freq='5min'):
             write_df.loc[day, 'period_length'] = length
 
             rows = get_rows(dfs, start, end)
-            rows_resampled = get_rows(dfs_resampled, start, end) 
 
             # Skip if all missing (includes case when there are no rows at all)
-            if rows_resampled['density'].isna().all():
+            if rows['density'].isna().all():
                 continue
             
             # Add diagnostics fields
-            n_rows = len(rows_resampled)
-            percent_missing = np.sum(np.isnan(rows_resampled['density'])) / n_rows
-            percent_filled = np.sum(rows_resampled['filled']) / n_rows
+            n_rows = len(rows)
+            percent_missing = np.sum(np.isnan(rows['density'])) / n_rows
+            percent_filled = np.sum(rows['filled']) / n_rows
 
             write_df.loc[day, 'percent_missing'] = percent_missing
             write_df.loc[day, 'percent_filled'] = percent_filled
@@ -296,13 +297,13 @@ def aggregate_single_station_year_to_daily(root, station, year, freq='5min'):
             # Perform integration on specified fields
             for spec in integrate_fields:
                 input_column, output_column = spec                    
-                write_df.loc[day, output_column] = rows_resampled[input_column].sum() * time_step_in_hours
+                write_df.loc[day, output_column] = rows[input_column].sum() * time_step_in_hours
 
             # Perform weighted average on specified fields    
             for spec in weighted_average_fields:
                 data_column, weight_column = spec
-                weights = rows_resampled[weight_column]
-                vals = rows_resampled[data_column]
+                weights = rows[weight_column]
+                vals = rows[data_column]
                 write_df.loc[day, data_column] = wtd_mean(weights, vals)
 
             # Perform simple average on specified fields
