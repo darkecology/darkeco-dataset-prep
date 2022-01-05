@@ -10,7 +10,145 @@ import functools
 Summarize vertical profiles across height dimension and aggregate to 
 one row per scan
 '''
-def aggregate_profile_to_scan_level(infile, lat_lon):
+def aggregate_profiles_to_scan_level(infiles, station_info):
+    
+    keep_cols = ['linear_eta',
+                 'linear_eta_unfiltered',
+                 'speed',
+                 'u',
+                 'v',
+                 'nbins',
+                 'percent_rain',
+                 'rmse']
+    
+
+    bin_width_m = 100
+    bin_width_km = 100/1000
+
+
+    station_col = []
+    lat_col = []
+    lon_col = []
+    date_col = []
+    
+    # Read files, add profile data to df and metadata to meta_df 
+    scan_dfs = []
+    for infile in infiles:
+
+        # Read profile and add to dataframe
+        '''Produce scan-level summary for a vertical profile'''        
+        scan_df = pd.read_csv(infile, usecols=keep_cols)
+        #assert (scan_df['bin_lower'].diff()[1:]==bin_width_m).all()
+        scan_dfs.append(scan_df)
+        
+        # Collect scan metadata
+        infile = infile.split('/')[-1]
+        station = infile[:4]
+        year = infile[4:8]
+        month = infile[8:10]
+        day = infile[10:12]
+        hour = infile[13:15]
+        minute = infile[15:17]
+        second = infile[17:19]
+
+        station_col.append(station)
+        lat_col.append(station_info[station]['lat'])
+        lon_col.append(station_info[station]['lon'])
+        date_col.append(f"{year}-{month}-{day} {hour}:{minute}:{second}Z")
+
+
+    df = pd.concat(scan_dfs)
+
+    # This adds the index of the file to each row for later grouping.
+    # It's a little obtuse, but much faster than alternatives, which is important
+    # b/c this routine takes a long time
+    df['file_number'] = np.repeat(np.arange(len(infiles)), 30)
+    
+    meta_df = pd.DataFrame({'station': station_col,
+                            'lat' : lat_col, 
+                            'lon' : lon_col, 
+                            'date' : date_col})
+
+    
+    # Vertically integrated reflectivity (vir)
+    #
+    #  -- units in each elevation bin are reflectivity (cm^2/km^3)
+    #
+    #  -- multiply by height of each bin in km to get cm^2/km^2
+    #
+    #     == total scattering area in that elevation bin per 1 sq km.
+    #        of area in x-y plane
+    #
+    #  -- add values together to get total scattering area in a column
+    #     above a 1km patch on the ground (cm^2/km^2)
+    #
+    #  -- (NOTE: can multiply these values by 10^-8 to get units
+    #      km^2/km^2, i.e., a unitless quantity. Interpretation: total
+    #      fraction of a 1 square km patch on the ground that would be
+    #      filled by the total scattering area of targets in the column
+    #      above it. I.e., zap all the birds so they fall to the
+    #      ground, and measure how much ground space is filled up.)
+
+    # Speed converted from m/s to km/h
+    speed_km_h = df['speed'] * (1/1000) * (3600/1)
+
+    weighted_average_cols = [('speed', 'linear_eta'),
+                             ('u', 'linear_eta'),
+                             ('v', 'linear_eta'),
+                             ('rmse', 'linear_eta'),
+                             ('percent_rain', 'nbins')]
+
+    # For columns where we will compute weighted averages, multiply
+    # by the appropriate weight column
+    for col, weight_col in weighted_average_cols:
+        df[col] *= df[weight_col]
+
+    # For vertically integrated reflectivity, units cm2 / km2
+    df['density'] = df['linear_eta'] * bin_width_km
+    df['density_unfiltered'] = df['linear_eta_unfiltered'] * bin_width_km
+
+    # For vertically integrated traffic rate, units cm2 / km / h
+    df['traffic_rate'] = df['linear_eta'] * speed_km_h * bin_width_km
+    df['traffic_rate_unfiltered'] = df['linear_eta_unfiltered'] * speed_km_h * bin_width_km
+
+    # Do vertical integration for each scan
+    df = df.groupby('file_number').sum()    
+    
+    # Complete the weighted average calculation by dividing by total weights
+    for col, weight_col in weighted_average_cols:
+        df[col] /= df[weight_col]
+
+    # Derived columns
+    df['density_precip'] = df['density_unfiltered'] - df['density']
+    df['traffic_rate_precip'] = df['traffic_rate_unfiltered'] - df['traffic_rate']
+
+    # Average track as compass bearing (degrees clockwise from north)
+    df['direction'] = pol2cmp(np.arctan2(df['v'], df['u']))
+
+    # Keep selected columns
+    df = df[['density', 
+             'density_precip', 
+             'traffic_rate', 
+             'traffic_rate_precip',
+             'u',
+             'v',
+             'speed',
+             'direction',
+             'percent_rain',
+             'rmse']]
+    
+    df = meta_df.join(df)
+    
+    return df
+
+
+
+
+'''
+Summarize vertical profiles across height dimension and aggregate to 
+one row per scan
+'''
+def aggregate_profile_to_scan_level_old(infile, lat_lon):
 
     '''Produce scan-level summary for a vertical profile'''
     scan = pd.read_csv(infile)

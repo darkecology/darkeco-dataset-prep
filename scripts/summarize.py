@@ -90,17 +90,16 @@ def aggregate_station_years_by_scan(root, stations, years, max_scans):
                             'v',                          # 9
                             'speed',                      # 10
                             'direction',                  # 11
-                            'percent_rain']               # 12
+                            'percent_rain',               # 12
+                            'rmse']                       # 13
 
             # Get rows from individual files
-            rows = []
-            for f in profile_paths:
-                if max_scans and num_scans >= max_scans:
-                    break
-                rows.append(util.aggregate_profile_to_scan_level(f, lat_lon))
-                num_scans += 1
 
-            df = pd.DataFrame(rows, columns=column_names)
+            if max_scans and len(profile_paths) > max_scans - num_scans:
+                profile_paths = profile_paths[:max_scans-num_scans]                
+            num_scans += len(profile_paths)
+            
+            df = util.aggregate_profiles_to_scan_level(profile_paths, lat_lon)
 
             do_solar_elevation = True
             if do_solar_elevation:
@@ -117,7 +116,7 @@ def aggregate_station_years_by_scan(root, stations, years, max_scans):
 
             df.to_csv(outfile, columns=column_names, index=False, float_format='%.4f')
 
-            n_scans = len(rows)
+            n_scans = len(df)
 
             elapsed = t.time()-start
             if n_scans > 0:
