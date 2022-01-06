@@ -249,7 +249,7 @@ def load_station_year(root, station, year, resampled=False):
     '''Load scan-level data for given (station, year)'''
     
     if resampled:
-        file = f'{root}/resampled/{station}_{year}.csv'
+        file = f'{root}/5min/{station}-{year}-5min.csv'
     else:
         file = f'{root}/scan_level/{station}-{year}.csv'
 
