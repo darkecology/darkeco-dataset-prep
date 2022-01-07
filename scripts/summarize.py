@@ -1,5 +1,4 @@
 import argparse
-import glob
 import os
 import sys
 import time as t
@@ -8,9 +7,10 @@ import warnings
 import pandas as pd
 import pvlib
 from tqdm import tqdm
+from tqdm.contrib.concurrent import process_map
 
 import util
-from nexrad import get_lat_lon
+import nexrad
 
 
 def main():
@@ -31,6 +31,7 @@ def main():
     parser.add_argument("--years", nargs="+", type=int, help="years to process")
     parser.add_argument("--max_scans", type=int, default=None)
     parser.add_argument("--scans_chunk_size", type=int, default=100)
+    parser.add_argument("--max_workers", type=int, default=64)
     parser.add_argument(
         "--actions",
         nargs="+",
@@ -55,6 +56,7 @@ def main():
             args.years,
             args.max_scans,
             chunk_size=args.scans_chunk_size,
+            max_workers=args.max_workers
         )
 
     if "resample" in actions or "all" in actions:
@@ -69,27 +71,14 @@ def main():
 
 
 def aggregate_station_years_by_scan(
-    profile_dir, root, stations, years, max_scans, chunk_size=100
+    profile_dir, root, stations, years, max_scans, chunk_size=100, max_workers=64
 ):
-
-    if not os.path.exists(root):
-        raise FileNotFoundError(f"Path {root} does not exist")
-
-    file_list_folder = f"{root}/file_lists/station_year_lists"
 
     if not os.path.exists(f"{root}/scan_level"):
         os.makedirs(f"{root}/scan_level")
 
-    lat_lon = get_lat_lon()
-
-    # TODO: could potentially be sped up by loading many profiles at once and using pandas commands, including
-    # TODO: group by to group by scan
-
-    paths = glob.glob(f"{file_list_folder}/*.txt")
-    filenames = [os.path.basename(p) for p in paths]
-    all_stations = set([f[:4] for f in filenames])
-
-    stations = stations or all_stations
+    stations = stations or util.get_stations(root)
+    years = years or util.get_years(root)
 
     for station in stations:
         for year in years:
@@ -98,12 +87,13 @@ def aggregate_station_years_by_scan(
             print(f"***Aggregate by scan***")
 
             station_year = f"{station}-{year}"
-            path = f"{file_list_folder}/{station}-{year}.txt"
-            if path not in paths:
-                warnings.warn(f"{path} not found")
+            print(f" - {station}-{year}")
+            file_list = f"{root}/file_lists/station_year_lists/{station}-{year}.txt"
+            if not os.path.exists(file_list):
+                warnings.warn(f"{file_list} not found")
                 continue
 
-            with open(path, "r") as infile:
+            with open(file_list, "r") as infile:
                 profile_paths = infile.read().split("\n")
 
             # turn into absolute paths
@@ -121,15 +111,15 @@ def aggregate_station_years_by_scan(
 
             if len(profile_paths) == 0:
                 continue
-            
-            def read_chunks():
-                print(f"{station}-{year}, chunks of {chunk_size}")
-                for pos in tqdm(range(0, len(profile_paths), chunk_size)):
-                    yield util.aggregate_profiles_to_scan_level(
-                        profile_paths[pos : pos + chunk_size], lat_lon
-                    )
 
-            df = pd.concat(read_chunks())
+            # Split paths into chunks
+            chunks = []
+            for pos in range(0, len(profile_paths), chunk_size):
+                chunks.append(profile_paths[pos : pos + chunk_size])
+
+            dfs = process_map(util.aggregate_profiles_to_scan_level, chunks, max_workers=max_workers, total=len(chunks))
+
+            df = pd.concat(dfs)
 
             # Add solar elevation (note: much faster to do in batch at end than row-by-row)
             solar_elev = pvlib.solarposition.spa_python(
@@ -179,12 +169,18 @@ def resample_station_years(root, stations, years, freq="5min"):
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    for station in stations:
-        for year in years:
+    stations = stations or util.get_stations(root)
+    years = years or util.get_years(root)
+
+    for year in tqdm(years):
+        for station in tqdm(stations):
 
             print(f"{station}-{year}")
+            if not os.path.exists(f"{root}/scan_level/{station}-{year}.csv"):
+                warnings.warn(f"{root}/scan_level/{station}-{year}.txt not found, must aggregate to scan level first")
+                continue
+            
             resampled_df = util.load_and_resample_station_year(root, station, year)
-
             resampled_df.insert(3, "date", resampled_df.index)
 
             outfile = f"{outdir}/{station}-{year:4d}-{freq}.csv"
@@ -205,9 +201,16 @@ def aggregate_station_years_to_daily(root, stations, years, freq="5min"):
     if not os.path.exists(daily_data_folder):
         os.makedirs(daily_data_folder)
 
-    for station in stations:
-        for year in years:
+    stations = stations or util.get_stations(root)
+    years = years or util.get_years(root)
+
+    for year in tqdm(years):
+        for station in tqdm(stations):
             print(f"{station}-{year}")
+            if not os.path.exists(f"{root}/5min/{station}-{year}-5min.csv"):
+                warnings.warn(f"{root}/5min/{station}-{year}-5min.txt not found, must aggregate to scan level first")
+                continue
+            
             df = util.aggregate_single_station_year_to_daily(
                 root, station, year, freq=freq
             )
@@ -215,5 +218,6 @@ def aggregate_station_years_to_daily(root, stations, years, freq="5min"):
             df.to_csv(outfile, index=False, float_format="%.6g")
 
 
+            
 if __name__ == "__main__":
     main()

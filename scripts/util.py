@@ -1,16 +1,18 @@
+import functools
+import glob
+import os
+
 import numpy as np
 import pandas as pd
 import pvlib
-import os
-import nexrad
-import functools
 
+import nexrad
 
 '''
 Summarize vertical profiles across height dimension and aggregate to 
 one row per scan
 '''
-def aggregate_profiles_to_scan_level(infiles, station_info):
+def aggregate_profiles_to_scan_level(infiles):
     
     keep_cols = ['linear_eta',
                  'linear_eta_unfiltered',
@@ -52,8 +54,8 @@ def aggregate_profiles_to_scan_level(infiles, station_info):
         second = infile[17:19]
 
         station_col.append(station)
-        lat_col.append(station_info[station]['lat'])
-        lon_col.append(station_info[station]['lon'])
+        lat_col.append(nexrad.locations[station]['lat'])
+        lon_col.append(nexrad.locations[station]['lon'])
         date_col.append(f"{year}-{month}-{day} {hour}:{minute}:{second}Z")
 
 
@@ -148,7 +150,7 @@ def aggregate_profiles_to_scan_level(infiles, station_info):
 Summarize vertical profiles across height dimension and aggregate to 
 one row per scan
 '''
-def aggregate_profile_to_scan_level_old(infile, lat_lon):
+def aggregate_profile_to_scan_level_old(infile):
 
     '''Produce scan-level summary for a vertical profile'''
     scan = pd.read_csv(infile)
@@ -221,8 +223,8 @@ def aggregate_profile_to_scan_level_old(infile, lat_lon):
     # TODO: double check calculation
     percent_rain = (scan['percent_rain'] * scan['nbins']).sum() / scan['nbins'].sum()
 
-    lat = lat_lon[station]["lat"]
-    lon = lat_lon[station]["lon"]
+    lat = nexrad.locations[station]["lat"]
+    lon = nexrad.locations[station]["lon"]
 
     row = [station,
            lat,
@@ -361,9 +363,8 @@ def aggregate_single_station_year_to_daily(root, station, year, freq='5min'):
     df = None
     next_df = None
 
-    NEXRAD_LOCATIONS = nexrad.get_lat_lon()    
-    lon = NEXRAD_LOCATIONS[station]['lon']
-    lat = NEXRAD_LOCATIONS[station]['lat']
+    lon = nexrad.locations[station]['lon']
+    lat = nexrad.locations[station]['lat']
 
     # Load data frames as needed (methods are memoized to avoid duplicate work)        
     df = load_station_year(root, station, year, resampled=True)
@@ -456,12 +457,10 @@ def aggregate_single_station_year_to_daily(root, station, year, freq='5min'):
 Helper function for daily aggregation. Get a data frame describing each day of the year.
 '''
 def get_day_info(station, year):
-    
-    NEXRAD_LOCATIONS = nexrad.get_lat_lon()
-    
+        
     # location information
-    lon = NEXRAD_LOCATIONS[station]['lon']
-    lat = NEXRAD_LOCATIONS[station]['lat']
+    lon = nexrad.locations[station]['lon']
+    lat = nexrad.locations[station]['lat']
     loc = pvlib.location.Location(lat, lon)
 
     # Get series of days from Jan 1 this year to Jan 1 next year
@@ -495,6 +494,22 @@ def get_day_info(station, year):
 '''
 Utilities
 '''
+
+def get_stations(root):
+    if not os.path.exists(f"{root}/file_lists"):
+        raise ValueError("{root}/file_lists not found")
+
+    paths = glob.glob(f"{root}/file_lists/station_lists/*.txt")
+    filenames = [os.path.basename(p) for p in paths]
+    return list(set([f[:4] for f in filenames]))
+
+def get_years(root):
+    if not os.path.exists(f"{root}/file_lists"):
+        raise ValueError("{root}/file_lists not found")
+
+    paths = glob.glob(f"{root}/file_lists/year_lists/*.txt")
+    filenames = [os.path.basename(p) for p in paths]
+    return list(set([f[:4] for f in filenames]))
 
 def wtd_mean(w, x):
     """Compute weighted mean of two pandas Series
