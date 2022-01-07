@@ -26,8 +26,19 @@ root/
 # Summary of Commands to Runs
 
 ~~~ text
+# Do this first
 python compile_file_list.py --root /data/cajun_results/cajun-complete
-python summarize.py --root /data/cajun_results/cajun-complete --stations KBOX KENX --years 2018
+
+# Run everything
+python summarize.py --root /data/cajun_results/cajun-complete # takes 3 hours/year of data
+
+# Run selected stations/years
+python summarize.py --root /data/cajun_results/cajun-complete --stations KBOX KENX --years 2017 2018
+
+# Run steps (scan, resample, daily) separately
+python summarize.py --root /data/cajun_results/cajun-complete --actions scan      # ~2 hours/year
+python summarize.py --root /data/cajun_results/cajun-complete --actions resample  # ~35 min/year
+python summarize.py --root /data/cajun_results/cajun-complete --actions daily     # ~20 min/year
 ~~~
 
 # Step 1: Compile file lists
