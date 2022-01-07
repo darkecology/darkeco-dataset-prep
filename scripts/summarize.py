@@ -30,7 +30,7 @@ def main():
     parser.add_argument("--stations", nargs="+", help="stations to process")
     parser.add_argument("--years", nargs="+", type=int, help="years to process")
     parser.add_argument("--max_scans", type=int, default=None)
-    parser.add_argument("--scans_chunk_size", type=int, default=500)
+    parser.add_argument("--scans_chunk_size", type=int, default=100)
     parser.add_argument(
         "--actions",
         nargs="+",
@@ -91,10 +91,10 @@ def aggregate_station_years_by_scan(
 
     stations = stations or all_stations
 
-    num_scans = 0
     for station in stations:
         for year in years:
 
+            num_scans = 0    
             print(f"***Aggregate by scan***")
 
             station_year = f"{station}-{year}"
@@ -115,10 +115,13 @@ def aggregate_station_years_by_scan(
 
             # Get rows from individual files
             if max_scans and len(profile_paths) > max_scans - num_scans:
-                profile_paths = profile_paths[: max_scans - num_scans]
+                profile_paths = profile_paths[:max_scans-num_scans]
 
             num_scans += len(profile_paths)
 
+            if len(profile_paths) == 0:
+                continue
+            
             def read_chunks():
                 print(f"{station}-{year}, chunks of {chunk_size}")
                 for pos in tqdm(range(0, len(profile_paths), chunk_size)):
