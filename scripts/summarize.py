@@ -1,6 +1,5 @@
 import argparse
 import os
-import sys
 import time as t
 import warnings
 
@@ -10,7 +9,6 @@ from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 
 import util
-import nexrad
 
 
 def main():
@@ -56,7 +54,7 @@ def main():
             args.years,
             args.max_scans,
             chunk_size=args.scans_chunk_size,
-            max_workers=args.max_workers
+            max_workers=args.max_workers,
         )
 
     if "resample" in actions or "all" in actions:
@@ -83,10 +81,9 @@ def aggregate_station_years_by_scan(
     for station in stations:
         for year in years:
 
-            num_scans = 0    
-            print(f"***Aggregate by scan***")
+            num_scans = 0
+            print("***Aggregate by scan***")
 
-            station_year = f"{station}-{year}"
             print(f" - {station}-{year}")
             file_list = f"{root}/file_lists/station_year_lists/{station}-{year}.txt"
             if not os.path.exists(file_list):
@@ -105,7 +102,7 @@ def aggregate_station_years_by_scan(
 
             # Get rows from individual files
             if max_scans and len(profile_paths) > max_scans - num_scans:
-                profile_paths = profile_paths[:max_scans-num_scans]
+                profile_paths = profile_paths[: max_scans - num_scans]
 
             num_scans += len(profile_paths)
 
@@ -115,9 +112,14 @@ def aggregate_station_years_by_scan(
             # Split paths into chunks
             chunks = []
             for pos in range(0, len(profile_paths), chunk_size):
-                chunks.append(profile_paths[pos : pos + chunk_size])
+                chunks.append(profile_paths[pos:pos+chunk_size])
 
-            dfs = process_map(util.aggregate_profiles_to_scan_level, chunks, max_workers=max_workers, total=len(chunks))
+            dfs = process_map(
+                util.aggregate_profiles_to_scan_level,
+                chunks,
+                max_workers=max_workers,
+                total=len(chunks),
+            )
 
             df = pd.concat(dfs)
 
@@ -177,9 +179,11 @@ def resample_station_years(root, stations, years, freq="5min"):
 
             print(f"{station}-{year}")
             if not os.path.exists(f"{root}/scan_level/{station}-{year}.csv"):
-                warnings.warn(f"{root}/scan_level/{station}-{year}.txt not found, must aggregate to scan level first")
+                warnings.warn(
+                    f"{root}/scan_level/{station}-{year}.txt not found, must aggregate to scan level first"
+                )
                 continue
-            
+
             resampled_df = util.load_and_resample_station_year(root, station, year)
             resampled_df.insert(3, "date", resampled_df.index)
 
@@ -195,7 +199,7 @@ def resample_station_years(root, stations, years, freq="5min"):
 
 def aggregate_station_years_to_daily(root, stations, years, freq="5min"):
 
-    print(f"***Aggregating to daily***")
+    print("***Aggregating to daily***")
 
     daily_data_folder = f"{root}/daily"
     if not os.path.exists(daily_data_folder):
@@ -208,9 +212,11 @@ def aggregate_station_years_to_daily(root, stations, years, freq="5min"):
         for station in tqdm(stations):
             print(f"{station}-{year}")
             if not os.path.exists(f"{root}/5min/{station}-{year}-5min.csv"):
-                warnings.warn(f"{root}/5min/{station}-{year}-5min.txt not found, must aggregate to scan level first")
+                warnings.warn(
+                    f"{root}/5min/{station}-{year}-5min.txt not found, must aggregate to scan level first"
+                )
                 continue
-            
+
             df = util.aggregate_single_station_year_to_daily(
                 root, station, year, freq=freq
             )
@@ -218,6 +224,5 @@ def aggregate_station_years_to_daily(root, stations, years, freq="5min"):
             df.to_csv(outfile, index=False, float_format="%.6g")
 
 
-            
 if __name__ == "__main__":
     main()
