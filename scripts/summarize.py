@@ -78,8 +78,8 @@ def aggregate_station_years_by_scan(
     stations = stations or util.get_stations(root)
     years = years or util.get_years(root)
 
-    for station in stations:
-        for year in years:
+    for year in years:
+        for station in stations:
 
             num_scans = 0
             print("***Aggregate by scan***")

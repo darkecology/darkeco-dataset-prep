@@ -507,7 +507,7 @@ def get_stations(root):
 
     paths = glob.glob(f"{root}/file_lists/station_lists/*.txt")
     filenames = [os.path.basename(p) for p in paths]
-    return list(set([f[:4] for f in filenames]))
+    return sorted([f[:4] for f in filenames])
 
 
 def get_years(root):
@@ -516,7 +516,7 @@ def get_years(root):
 
     paths = glob.glob(f"{root}/file_lists/year_lists/*.txt")
     filenames = [os.path.basename(p) for p in paths]
-    return list(set([f[:4] for f in filenames]))
+    return sorted([int(f[:4]) for f in filenames])
 
 
 def wtd_mean(w, x):
