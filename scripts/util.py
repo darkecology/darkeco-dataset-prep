@@ -391,6 +391,7 @@ def aggregate_single_station_year_to_daily(root, station, year, freq="5min"):
     time_periods = [
         {"name": "day", "start": "sunrise", "end": "sunset"},
         {"name": "night", "start": "sunset", "end": "next_sunrise"},
+        {"name": "calendar_day_utc", "start": "midnight_utc", "end": "next_midnight_utc"},
     ]
 
     write_dfs = []
@@ -480,7 +481,10 @@ def get_day_info(station, year):
     day_info = loc.get_sun_rise_set_transit(days, method="spa")
 
     day_info["date"] = day_info.index.date
+    day_info["midnight_utc"] = day_info.index
+    day_info["next_midnight_utc"] = day_info["midnight_utc"] + pd.DateOffset(days=1)
 
+    
     # Add column for next sunrise, then drop last row, which corresponds to first day of following year
     day_info["next_sunrise"] = day_info["sunrise"].shift(-1)
     day_info = day_info.iloc[:-1]
