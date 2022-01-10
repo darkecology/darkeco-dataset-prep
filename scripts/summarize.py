@@ -6,7 +6,6 @@ import warnings
 import pandas as pd
 import pvlib
 from tqdm import tqdm
-from tqdm.contrib.concurrent import process_map
 
 import util
 
@@ -29,7 +28,7 @@ def main():
     parser.add_argument("--years", nargs="+", type=int, help="years to process")
     parser.add_argument("--max_scans", type=int, default=None)
     parser.add_argument("--scans_chunk_size", type=int, default=100)
-    parser.add_argument("--max_workers", type=int, default=64)
+    parser.add_argument("--max_workers", type=int, default=None)
     parser.add_argument(
         "--actions",
         nargs="+",
@@ -69,7 +68,7 @@ def main():
 
 
 def aggregate_station_years_by_scan(
-    profile_dir, root, stations, years, max_scans, chunk_size=100, max_workers=64
+    profile_dir, root, stations, years, max_scans=None, chunk_size=100, max_workers=None
 ):
 
     if not os.path.exists(f"{root}/scan_level"):
@@ -78,90 +77,37 @@ def aggregate_station_years_by_scan(
     stations = stations or util.get_stations(root)
     years = years or util.get_years(root)
 
+    print("***Aggregate by scan***")
     for year in years:
         for station in stations:
 
-            num_scans = 0
-            print("***Aggregate by scan***")
-
             print(f" - {station}-{year}")
-            file_list = f"{root}/file_lists/station_year_lists/{station}-{year}.txt"
-            if not os.path.exists(file_list):
-                warnings.warn(f"{file_list} not found")
-                continue
-
-            with open(file_list, "r") as infile:
-                profile_paths = infile.read().split("\n")
-
-            # turn into absolute paths
-            profile_paths = [
-                f"{profile_dir}/{profile_path}" for profile_path in profile_paths
-            ]
-
             start = t.time()
-
-            # Get rows from individual files
-            if max_scans and len(profile_paths) > max_scans - num_scans:
-                profile_paths = profile_paths[: max_scans - num_scans]
-
-            num_scans += len(profile_paths)
-
-            if len(profile_paths) == 0:
-                continue
-
-            # Split paths into chunks
-            chunks = []
-            for pos in range(0, len(profile_paths), chunk_size):
-                chunks.append(profile_paths[pos:pos+chunk_size])
-
-            dfs = process_map(
-                util.aggregate_profiles_to_scan_level,
-                chunks,
-                max_workers=max_workers,
-                total=len(chunks),
-            )
-
-            df = pd.concat(dfs)
-
-            # Add solar elevation (note: much faster to do in batch at end than row-by-row)
-            solar_elev = pvlib.solarposition.spa_python(
-                df["date"], df["lat"], df["lon"]
-            )
-            df["solar_elevation"] = solar_elev["elevation"].values
-
-            # Convert lat/lon to strings to preserve full precision --- other floats will be truncated
-            df["lat"] = df["lat"].apply(str)
-            df["lon"] = df["lon"].apply(str)
-
-            column_names = [
-                "station",  # 0
-                "lat",  # 1
-                "lon",  # 2
-                "date",  # 3
-                "solar_elevation",  # 4
-                "density",  # 5
-                "density_precip",  # 6
-                "traffic_rate",  # 7
-                "traffic_rate_precip",  # 8
-                "u",  # 9
-                "v",  # 10
-                "speed",  # 11
-                "direction",  # 12
-                "percent_rain",  # 13
-                "rmse",
-            ]  # 14
-
-            outfile = f"{root}/scan_level/{station}-{year}.csv"
-            df.to_csv(outfile, columns=column_names, index=False, float_format="%.4f")
-
-            n_scans = len(df)
-
-            elapsed = t.time() - start
-            if n_scans > 0:
-                print(
-                    f"  time={elapsed:.2f}, scans={n_scans}, per scan={elapsed/n_scans:.4f}"
+            try:
+                df, column_names = util.aggregate_single_station_year_by_scan(
+                    profile_dir,
+                    root,
+                    station,
+                    year,
+                    max_scans=max_scans,
+                    chunk_size=chunk_size,
+                    max_workers=max_workers
                 )
 
+                outfile = f"{root}/scan_level/{station}-{year}.csv"
+                df.to_csv(outfile, columns=column_names, index=False, float_format="%.4f")
+
+                n_scans = len(df)
+                elapsed = t.time() - start
+                if n_scans > 0:
+                    print(
+                        f"  time={elapsed:.2f}, scans={n_scans}, per scan={elapsed/n_scans:.4f}"
+                    )
+
+            except ValueError as e:
+                print(e)
+
+                    
 
 def resample_station_years(root, stations, years, freq="5min"):
 
@@ -184,13 +130,14 @@ def resample_station_years(root, stations, years, freq="5min"):
                 )
                 continue
 
-            resampled_df = util.load_and_resample_station_year(root, station, year)
+            resampled_df, column_names = util.load_and_resample_station_year(root, station, year)
             resampled_df.insert(3, "date", resampled_df.index)
 
             outfile = f"{outdir}/{station}-{year:4d}-{freq}.csv"
 
             resampled_df.to_csv(
                 outfile,
+                columns=column_names,
                 date_format="%Y-%m-%d %H:%M:%SZ",
                 float_format="%.4f",
                 index=False,

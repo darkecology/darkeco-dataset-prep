@@ -6,7 +6,78 @@ import numpy as np
 import pandas as pd
 import pvlib
 
+from tqdm.contrib.concurrent import process_map
+
 import nexrad
+
+key_cols = [
+    "station",
+    "date",
+]
+
+meta_cols = [
+    "station",
+    "solar_elevation",
+    "period_date",
+    "period",
+    "period_time",
+    "period_length",
+]
+
+data_cols = [
+    "density",
+    "density_precip",
+    "traffic_rate",
+    "traffic_rate_precip",
+    "u",
+    "v",
+    "speed",
+    "direction",
+    "percent_rain",
+    "rmse",
+]
+
+def aggregate_single_station_year_by_scan(
+        profile_dir, root, station, year, max_scans=None, chunk_size=100, max_workers=None
+):
+
+    # Get list of profiles for this station-year from file lists
+    file_list = f"{root}/file_lists/station_year_lists/{station}-{year}.txt"
+    if not os.path.exists(file_list):
+        raise ValueError(f"no profiles for {station}-{year}")
+        
+    with open(file_list, "r") as infile:
+        profile_paths = infile.read().split("\n")
+
+    # turn into absolute paths
+    profile_paths = [
+        f"{profile_dir}/{profile_path}" for profile_path in profile_paths
+    ]
+    
+    # Get rows from individual files
+    if max_scans and len(profile_paths) > max_scans:
+        profile_paths = profile_paths[: max_scans]
+
+    # Split paths into chunks
+    chunks = []
+    for pos in range(0, len(profile_paths), chunk_size):
+        chunks.append(profile_paths[pos:pos+chunk_size])
+
+    dfs = process_map(
+        aggregate_profiles_to_scan_level,
+        chunks,
+        max_workers=max_workers,
+        total=len(chunks),
+    )
+
+    df = pd.concat(dfs)
+
+    df = add_solar_elevation(df, df["date"], station)
+    df = add_period_info(df, pd.to_datetime(df['date']), station, year)
+    column_names = key_cols + meta_cols + data_cols
+
+    return df, column_names
+
 
 """
 Summarize vertical profiles across height dimension and aggregate to
@@ -30,8 +101,6 @@ def aggregate_profiles_to_scan_level(infiles):
     bin_width_km = 100 / 1000
 
     station_col = []
-    lat_col = []
-    lon_col = []
     date_col = []
 
     # Read files, add profile data to df and metadata to meta_df
@@ -55,8 +124,6 @@ def aggregate_profiles_to_scan_level(infiles):
         second = infile[17:19]
 
         station_col.append(station)
-        lat_col.append(nexrad.locations[station]["lat"])
-        lon_col.append(nexrad.locations[station]["lon"])
         date_col.append(f"{year}-{month}-{day} {hour}:{minute}:{second}Z")
 
     df = pd.concat(scan_dfs)
@@ -67,7 +134,7 @@ def aggregate_profiles_to_scan_level(infiles):
     df["file_number"] = np.repeat(np.arange(len(infiles)), 30)
 
     meta_df = pd.DataFrame(
-        {"station": station_col, "lat": lat_col, "lon": lon_col, "date": date_col}
+        {"station": station_col, "date": date_col}
     )
 
     # Vertically integrated reflectivity (vir)
@@ -150,107 +217,6 @@ def aggregate_profiles_to_scan_level(infiles):
     return df
 
 
-"""
-Summarize vertical profiles across height dimension and aggregate to
-one row per scan
-"""
-
-
-def aggregate_profile_to_scan_level_old(infile):
-
-    """Produce scan-level summary for a vertical profile"""
-    scan = pd.read_csv(infile)
-
-    infile = infile.split("/")[-1]
-
-    station = infile[:4]
-    year = infile[4:8]
-    month = infile[8:10]
-    day = infile[10:12]
-    hour = infile[13:15]
-    minute = infile[15:17]
-    second = infile[17:19]
-
-    date = f"{year}-{month}-{day} {hour}:{minute}:{second}Z"
-
-    bin_widths = np.diff(scan["bin_lower"])
-    if np.all(bin_widths == bin_widths[0]):
-        bin_width = bin_widths[0]  # bin width in meters
-    else:
-        raise ValueError("Bin vertical widths are not consistent!")
-
-    bin_width_km = bin_width / 1000  # bin width in km
-
-    # Vertically integrated reflectivity (vir)
-    #
-    #  -- units in each elevation bin are reflectivity (cm^2/km^3)
-    #
-    #  -- multiply by height of each bin in km to get cm^2/km^2
-    #
-    #     == total scattering area in that elevation bin per 1 sq km.
-    #        of area in x-y plane
-    #
-    #  -- add values together to get total scattering area in a column
-    #     above a 1km patch on the ground (cm^2/km^2)
-    #
-    #  -- (NOTE: can multiply these values by 10^-8 to get units
-    #      km^2/km^2, i.e., a unitless quantity. Interpretation: total
-    #      fraction of a 1 square km patch on the ground that would be
-    #      filled by the total scattering area of targets in the column
-    #      above it. I.e., zap all the birds so they fall to the
-    #      ground, and measure how much ground space is filled up.)
-
-    linear_eta = np.array(scan["linear_eta"])
-
-    # Compute vertically integrated reflectivity in cm2 / km2
-    density = np.nansum(bin_width_km * linear_eta)
-    density_unfiltered = np.nansum(bin_width_km * scan["linear_eta_unfiltered"])
-    density_precip = density_unfiltered - density
-    assert np.all(np.isnan(density_precip) | (density_precip >= 0))
-
-    # Speed converted from m/s to km/h
-    speed_km_h = scan["speed"] * (1 / 1000) * (3600 / 1)
-
-    # Compute traffic rate in cm2 / km / h
-    traffic_rate = np.nansum(bin_width_km * linear_eta * speed_km_h)
-    traffic_rate_unfiltered = np.nansum(
-        bin_width_km * scan["linear_eta_unfiltered"] * speed_km_h
-    )
-    traffic_rate_precip = traffic_rate_unfiltered - traffic_rate
-
-    assert np.all(np.isnan(traffic_rate_precip) | (traffic_rate_precip >= 0))
-
-    # Average velocity and speed weighted by reflectivity
-    u = wtd_mean(linear_eta, scan["u"])
-    v = wtd_mean(linear_eta, scan["v"])
-    speed = wtd_mean(linear_eta, scan["speed"])
-
-    # Average track as compass bearing (degrees clockwise from north)
-    direction = pol2cmp(np.arctan2(v, u))
-
-    # TODO: double check calculation
-    percent_rain = (scan["percent_rain"] * scan["nbins"]).sum() / scan["nbins"].sum()
-
-    lat = nexrad.locations[station]["lat"]
-    lon = nexrad.locations[station]["lon"]
-
-    row = [
-        station,
-        lat,
-        lon,
-        date,
-        density,
-        density_precip,
-        traffic_rate,
-        traffic_rate_precip,
-        u,
-        v,
-        speed,
-        direction,
-        percent_rain,
-    ]
-
-    return row
 
 
 """
@@ -259,7 +225,7 @@ Load one station-year scan-level time series
 
 
 @functools.lru_cache(maxsize=32)
-def load_station_year(root, station, year, resampled=False):
+def load_station_year(root, station, year, resampled=False, **kwargs):
     """Load scan-level data for given (station, year)"""
 
     if resampled:
@@ -270,7 +236,7 @@ def load_station_year(root, station, year, resampled=False):
     print(f"Loading {file}")
 
     if os.path.exists(file):
-        df = pd.read_csv(file)
+        df = pd.read_csv(file, **kwargs)
         df["date"] = pd.to_datetime(df["date"], utc=True)
         df = df.set_index("date")
         return df
@@ -305,13 +271,13 @@ def load_and_resample_station_year(
     root, station, year, trim=True, freq="5Min", limit=12, limit_direction="both"
 ):
     """Load scan-level data for (station, year) and resample to fixed times"""
-
-    data = load_station_year(root, station, year)
-
+    
+    df = load_station_year(root, station, year, usecols=tuple(key_cols+data_cols))
+    
     if trim:
         # Trim to days that exist in data
-        start = data.index.min().floor("D")
-        end = data.index.max().ceil("D")
+        start = df.index.min().floor("D")
+        end = df.index.max().ceil("D")
     else:
         # Use whole year
         start = pd.Timestamp(year=year, month=1, day=1)
@@ -320,21 +286,26 @@ def load_and_resample_station_year(
     index = pd.date_range(start, end, freq=freq, tz="UTC")
 
     # First resample with limit=2 and record missing entries
-    resampled_data = resample(data, index, limit=2, limit_direction=limit_direction)
+    df = resample(df, index, limit=2, limit_direction=limit_direction)
 
-    missing_before = np.isnan(resampled_data["lat"])
+    missing_before = np.isnan(df["density"])
 
     # Now interpolate with the requested limit and record which values were filled
-    resampled_data = resampled_data.interpolate(
+    df = df.interpolate(
         method="time", limit=limit, limit_direction=limit_direction
     )
 
-    missing_now = np.isnan(resampled_data["lat"])
-    resampled_data["filled"] = (missing_before & ~missing_now).astype("int")
+    missing_now = np.isnan(df["density"])
+    df["filled"] = (missing_before & ~missing_now).astype("int")
 
-    resampled_data["station"] = station
+    # Add meta-data columns
+    df["station"] = station
+    df = add_solar_elevation(df, df.index, station)
+    df = add_period_info(df, df.index, station, year)
+    column_names = key_cols + meta_cols + data_cols + ["filled"]
 
-    return resampled_data
+    print(df)
+    return df, column_names
 
 
 """
@@ -499,6 +470,58 @@ def get_day_info(station, year):
 
     return day_info
 
+
+def get_period_info(station, year):
+    
+    info = get_day_info(station, year) 
+    units = pd.Timedelta('1 hour')
+
+    periods = []
+    for day, row in info.iterrows():    
+        periods.append([day.date(), 
+                        'day', 
+                        row['sunrise'], 
+                        (row['sunset']-row['sunrise']) / units ])
+
+        periods.append([day.date(),
+                        'night', 
+                        row['sunset'], 
+                        (row['next_sunrise']-row['sunset']) / units ])
+
+    periods = pd.DataFrame(periods, columns = ['period_date', 'period', 'period_start', 'period_length'])
+    periods.index = periods['period_date'].astype(str) + '-' + periods['period']
+        
+    return periods, units
+
+
+def add_solar_elevation(df, dates, station):
+    
+    solar_elev = pvlib.solarposition.spa_python(
+        dates,
+        nexrad.locations[station]["lat"],
+        nexrad.locations[station]["lon"]
+    )
+
+    df["solar_elevation"] = solar_elev["elevation"].values
+
+    return df
+
+def add_period_info(df, index, station, year):
+        
+    # Get information about periods
+    periods, units = get_period_info(station, year)
+    
+    # Cut df on period
+    df['key'] = pd.cut(index, periods['period_start'], labels=periods.index[:-1])
+    
+    # Join with period info
+    df = df.join(periods, on='key')
+
+    # Massage columns
+    df['period_time'] = (index-df['period_start']) / units
+    df = df.drop(columns=['key', 'period_start'])
+
+    return df
 
 """
 Utilities
