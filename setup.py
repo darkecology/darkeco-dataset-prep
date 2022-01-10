@@ -9,8 +9,8 @@ setup(
     author='Dan Sheldon',
     author_email='sheldon@cs.umass.edu',
     install_requires=[
-        'pvlib',
         'pandas>=1.0.0'
+        'pvlib>=0.9.0',
     ],
     keywords='radar aeroecology bird migration',
     license='MIT'
