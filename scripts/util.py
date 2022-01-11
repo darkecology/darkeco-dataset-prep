@@ -17,7 +17,6 @@ key_cols = [
 ]
 
 meta_cols = [
-    "station",
     "solar_elevation",
     "period_date",
     "period",
