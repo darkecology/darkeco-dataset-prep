@@ -235,9 +235,9 @@ def load_station_year(root, station, year, resampled=False, **kwargs):
     """Load scan-level data for given (station, year)"""
 
     if resampled:
-        file = f"{root}/5min/{station}-{year}-5min.csv"
+        file = f"{root}/5min/{year}/{station}-{year}-5min.csv"
     else:
-        file = f"{root}/scan_level/{station}-{year}.csv"
+        file = f"{root}/scans/{year}/{station}-{year}.csv"
 
     #print(f"Loading {file}")
 
@@ -439,7 +439,7 @@ Helper function for daily aggregation. Get a data frame describing each day of t
 """
 
 
-def get_day_info(station, year):
+def get_day_info(station, year, pad=None):
 
     # location information
     lon = nexrad.locations[station]["lon"]
@@ -449,6 +449,11 @@ def get_day_info(station, year):
     # Get series of days from Jan 1 this year to Jan 1 next year
     start = pd.Timestamp(year=year, month=1, day=1)
     end = pd.Timestamp(year=year + 1, month=1, day=1)
+
+    if pad is not None:
+        start = start - pd.DateOffset(days=pad)
+        end = end + pd.DateOffset(days=pad)
+
     days = pd.date_range(start, end, freq="D", tz="UTC")
 
     # Get sunrise, sunset, and transit times
@@ -478,7 +483,7 @@ def get_day_info(station, year):
 
 def get_period_info(station, year):
     
-    info = get_day_info(station, year) 
+    info = get_day_info(station, year, pad=1)
     units = pd.Timedelta('1 hour')
 
     periods = []
