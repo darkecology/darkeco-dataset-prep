@@ -233,7 +233,7 @@ def load_station_year(root, station, year, resampled=False, **kwargs):
     else:
         file = f"{root}/scan_level/{station}-{year}.csv"
 
-    print(f"Loading {file}")
+    #print(f"Loading {file}")
 
     if os.path.exists(file):
         df = pd.read_csv(file, **kwargs)
@@ -304,7 +304,6 @@ def load_and_resample_station_year(
     df = add_period_info(df, df.index, station, year)
     column_names = key_cols + meta_cols + data_cols + ["filled"]
 
-    print(df)
     return df, column_names
 
 

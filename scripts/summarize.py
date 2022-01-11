@@ -6,6 +6,7 @@ import warnings
 import pandas as pd
 import pvlib
 from tqdm import tqdm
+from tqdm.contrib.concurrent import process_map
 
 import util
 
@@ -109,6 +110,31 @@ def aggregate_station_years_by_scan(
 
                     
 
+def resample_single_station_year(arg):
+
+    root, outdir, station, year, freq = arg
+    
+    print(f"{station}-{year}")
+    if not os.path.exists(f"{root}/scan_level/{station}-{year}.csv"):
+        warnings.warn(
+            f"{root}/scan_level/{station}-{year}.txt not found, must aggregate to scan level first"
+        )
+        return
+        
+    resampled_df, column_names = util.load_and_resample_station_year(root, station, year)
+    resampled_df.insert(3, "date", resampled_df.index)
+
+    outfile = f"{outdir}/{station}-{year:4d}-{freq}.csv"
+
+    resampled_df.to_csv(
+        outfile,
+        columns=column_names,
+        date_format="%Y-%m-%d %H:%M:%SZ",
+        float_format="%.4f",
+        index=False,
+    )
+
+
 def resample_station_years(root, stations, years, freq="5min"):
 
     print(f"***Resampling to {freq}***")
@@ -121,28 +147,9 @@ def resample_station_years(root, stations, years, freq="5min"):
     years = years or util.get_years(root)
 
     for year in tqdm(years):
-        for station in tqdm(stations):
-
-            print(f"{station}-{year}")
-            if not os.path.exists(f"{root}/scan_level/{station}-{year}.csv"):
-                warnings.warn(
-                    f"{root}/scan_level/{station}-{year}.txt not found, must aggregate to scan level first"
-                )
-                continue
-
-            resampled_df, column_names = util.load_and_resample_station_year(root, station, year)
-            resampled_df.insert(3, "date", resampled_df.index)
-
-            outfile = f"{outdir}/{station}-{year:4d}-{freq}.csv"
-
-            resampled_df.to_csv(
-                outfile,
-                columns=column_names,
-                date_format="%Y-%m-%d %H:%M:%SZ",
-                float_format="%.4f",
-                index=False,
-            )
-
+        args = [(root, outdir, station, year, freq) for station in stations]
+        process_map(resample_single_station_year, args)
+        
 
 def aggregate_station_years_to_daily(root, stations, years, freq="5min"):
 
