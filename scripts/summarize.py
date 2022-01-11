@@ -72,8 +72,8 @@ def aggregate_station_years_by_scan(
     profile_dir, root, stations, years, max_scans=None, chunk_size=100, max_workers=None
 ):
 
-    if not os.path.exists(f"{root}/scan_level"):
-        os.makedirs(f"{root}/scan_level")
+    if not os.path.exists(f"{root}/scans"):
+        os.makedirs(f"{root}/scans")
 
     stations = stations or util.get_stations(root)
     years = years or util.get_years(root)
@@ -95,7 +95,7 @@ def aggregate_station_years_by_scan(
                     max_workers=max_workers
                 )
 
-                outfile = f"{root}/scan_level/{station}-{year}.csv"
+                outfile = f"{root}/scans/{year}/{station}-{year}.csv"
                 df.to_csv(outfile, columns=column_names, index=False, float_format="%.4f")
 
                 n_scans = len(df)
@@ -115,16 +115,16 @@ def resample_single_station_year(arg):
     root, outdir, station, year, freq = arg
     
     print(f"{station}-{year}")
-    if not os.path.exists(f"{root}/scan_level/{station}-{year}.csv"):
+    if not os.path.exists(f"{root}/scans/{year}/{station}-{year}.csv"):
         warnings.warn(
-            f"{root}/scan_level/{station}-{year}.txt not found, must aggregate to scan level first"
+            f"{root}/scans/{year}/{station}-{year}.txt not found, must aggregate to scan level first"
         )
         return
         
     resampled_df, column_names = util.load_and_resample_station_year(root, station, year)
     resampled_df.insert(3, "date", resampled_df.index)
 
-    outfile = f"{outdir}/{station}-{year:4d}-{freq}.csv"
+    outfile = f"{root}/{freq}/{year}/{station}-{year:4d}-{freq}.csv"
 
     resampled_df.to_csv(
         outfile,
@@ -140,8 +140,8 @@ def resample_station_years(root, stations, years, freq="5min"):
     print(f"***Resampling to {freq}***")
 
     outdir = f"{root}/{freq}"
-    if not os.path.exists(outdir):
-        os.makedirs(outdir)
+    if not os.path.exists(f"{root}/{freq}"):
+        os.makedirs(f"{root}/{freq}")
 
     stations = stations or util.get_stations(root)
     years = years or util.get_years(root)
@@ -149,33 +149,40 @@ def resample_station_years(root, stations, years, freq="5min"):
     for year in tqdm(years):
         args = [(root, outdir, station, year, freq) for station in stations]
         process_map(resample_single_station_year, args)
+
         
 
+def aggregate_single_station_year_to_daily_helper(arg):
+    
+    root, station, year, freq = arg
+
+    print(f"{station}-{year}")
+    if not os.path.exists(f"{root}/{freq}/{year}/{station}-{year}-5min.csv"):
+        warnings.warn(
+            f"{root}/{freq}/{year}/{station}-{year}-{freq}.txt not found, must aggregate to scan level and resample first"
+        )
+        return
+    
+    df = util.aggregate_single_station_year_to_daily(
+        root, station, year, freq=freq
+    )
+    outfile = f"{root}/daily/{year}/{station}-{year}-daily.csv"
+    df.to_csv(outfile, index=False, float_format="%.6g")
+    
+    
 def aggregate_station_years_to_daily(root, stations, years, freq="5min"):
 
     print("***Aggregating to daily***")
 
-    daily_data_folder = f"{root}/daily"
-    if not os.path.exists(daily_data_folder):
-        os.makedirs(daily_data_folder)
+    if not os.path.exists(f"{root}/daily"):
+        os.makedirs(f"{root}/daily")
 
     stations = stations or util.get_stations(root)
     years = years or util.get_years(root)
 
     for year in tqdm(years):
-        for station in tqdm(stations):
-            print(f"{station}-{year}")
-            if not os.path.exists(f"{root}/5min/{station}-{year}-5min.csv"):
-                warnings.warn(
-                    f"{root}/5min/{station}-{year}-5min.txt not found, must aggregate to scan level first"
-                )
-                continue
-
-            df = util.aggregate_single_station_year_to_daily(
-                root, station, year, freq=freq
-            )
-            outfile = f"{daily_data_folder}/{station}-{year}-daily.csv"
-            df.to_csv(outfile, index=False, float_format="%.6g")
+        args = [(root, station, year, freq) for station in stations]
+        process_map(aggregate_single_station_year_to_daily_helper, args)
 
 
 if __name__ == "__main__":

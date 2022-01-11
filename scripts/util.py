@@ -1,6 +1,7 @@
 import functools
 import glob
 import os
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -36,6 +37,11 @@ data_cols = [
     "percent_rain",
     "rmse",
 ]
+
+
+
+warnings.formatwarning = lambda msg, *args, **kwargs: str(msg) + "\n"
+
 
 def aggregate_single_station_year_by_scan(
         profile_dir, root, station, year, max_scans=None, chunk_size=100, max_workers=None
@@ -369,7 +375,7 @@ def aggregate_single_station_year_to_daily(root, station, year, freq="5min"):
     # Iterate over periods (night, day)
     for period in time_periods:
 
-        print(f'Processing {period["name"]} data')
+        #print(f'Processing {period["name"]} data')
 
         write_df = pd.DataFrame(index=day_info.index)
         write_dfs.append(write_df)

@@ -4,6 +4,8 @@ import os
 
 import pandas as pd
 from tqdm import tqdm
+from tqdm.contrib.concurrent import process_map
+from multiprocessing import RLock
 
 import util
 
@@ -43,79 +45,90 @@ def main():
 
     years = args.years or util.get_years(root)
     
-    for year in years:
-        print(f"***{year}***")
-        if args.do_5min:
-            print(" * 5-minute")
-            files = glob.glob(f"{root}/5min/????-{year}-5min.csv")
+    params = [(i, root, year, args) for i, year in enumerate(years)]
+    tqdm.set_lock(RLock())
+    p = Pool(initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),))
+    p.map(do_one_year, params)
+    
 
-            print("   - reading files")
+def do_one_year(params):
+
+    i, root, year, args = params
+    
+    if args.do_5min:
+        files = glob.glob(f"{root}/5min/????-{year}-5min.csv")
+
+        def read_files(files):
             
-            def read_files(files):
-                for file in tqdm(files):
-                    yield pd.read_csv(
-                        file,
-                        usecols=['station',
-                                 'date',
-                                 'density',
-                                 'traffic_rate',
-                                 'u',
-                                 'v',
-                                 'percent_rain']
-                    )
+            for file in tqdm(
+                    files,
+                    desc=f"{year}, 5-minute",
+                    lock_args=None,
+                    position=i):
+                
+                yield pd.read_csv(
+                    file,
+                    usecols=['station',
+                             'date',
+                             'density',
+                             'traffic_rate',
+                             'u',
+                             'v',
+                             'percent_rain']
+                )
 
-            df = pd.concat(read_files(files))
+        df = pd.concat(read_files(files))
 
-            # df = df.pivot(
-            #     index=["date"],
-            #     columns="station",
-            #     values=["density", "traffic_rate", "u", "v", "percent_rain"],
-            # )
+        # df = df.pivot(
+        #     index=["date"],
+        #     columns="station",
+        #     values=["density", "traffic_rate", "u", "v", "percent_rain"],
+        # )
 
-            print("   - writing output")
-            outdir = f"{root}/allstations/5min"
-            if not os.path.exists(outdir):
-                os.makedirs(outdir)
-            outfile = f"{outdir}/{year}-5min.csv"
-            df.to_csv(outfile)
+        outdir = f"{root}/allstations/5min"
+        if not os.path.exists(outdir):
+            os.makedirs(outdir)
+        outfile = f"{outdir}/{year}-5min.csv"
+        df.to_csv(outfile)
 
-        if args.do_daily:
-            print(" * Daily")
-            files = glob.glob(f"{root}/daily/????-{year}-daily.csv")
+    if args.do_daily:
+        files = glob.glob(f"{root}/daily/????-{year}-daily.csv")
 
-            print("   - reading files")
+        def read_files(files):
+            for file in tqdm(
+                    files,
+                    desc=f"{year}, daily",
+                    lock_args=None,
+                    position=i):
+                
+                yield pd.read_csv(
+                    file,
+                    usecols=['station',
+                             'date',
+                             'period',
+                             'period_length',
+                             'density_hours',
+                             'u',
+                             'v',
+                             'percent_missing',
+                             'percent_rain']
+                )
 
-            def read_files(files):
-                for file in tqdm(files):
-                    yield pd.read_csv(
-                        file,
-                        usecols=['station',
-                                 'date',
-                                 'period',
-                                 'period_length',
-                                 'density_hours',
-                                 'u',
-                                 'v',
-                                 'percent_missing',
-                                 'percent_rain']
-                    )
+        df = pd.concat(read_files(files))
 
-            df = pd.concat(read_files(files))
+        # df = df[df["percent_missing"] <= 0.2]
 
-            # df = df[df["percent_missing"] <= 0.2]
+        # df = df.pivot(
+        #     index=["date", "period"],
+        #     columns="station",
+        #     values=["density_hours", "u", "v", "percent_rain"],
+        # )
 
-            # df = df.pivot(
-            #     index=["date", "period"],
-            #     columns="station",
-            #     values=["density_hours", "u", "v", "percent_rain"],
-            # )
-
-            print("   - writing output")
-            outdir = f"{root}/allstations/daily"
-            if not os.path.exists(outdir):
-                os.makedirs(outdir)
-            outfile = f"{outdir}/{year}-daily.csv"
-            df.to_csv(outfile)
+        outdir = f"{root}/allstations/daily"
+        if not os.path.exists(outdir):
+            os.makedirs(outdir)
+        outfile = f"{outdir}/{year}-daily.csv"
+        df.to_csv(outfile)
 
 
 if __name__ == "__main__":
