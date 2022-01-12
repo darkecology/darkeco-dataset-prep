@@ -85,7 +85,7 @@ def do_one_year(params):
         #     values=["density", "traffic_rate", "u", "v", "percent_rain"],
         # )
 
-        outdir = f"{root}/allstations/5min"
+        outdir = f"{root}/combined-5min"
         if not os.path.exists(outdir):
             os.makedirs(outdir)
         outfile = f"{outdir}/{year}-5min.csv"
@@ -124,7 +124,7 @@ def do_one_year(params):
         #     values=["density_hours", "u", "v", "percent_rain"],
         # )
 
-        outdir = f"{root}/allstations/daily"
+        outdir = f"{root}/combined-daily"
         if not os.path.exists(outdir):
             os.makedirs(outdir)
         outfile = f"{outdir}/{year}-daily.csv"
