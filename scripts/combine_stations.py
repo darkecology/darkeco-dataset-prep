@@ -5,7 +5,7 @@ import os
 import pandas as pd
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
-from multiprocessing import RLock
+from multiprocessing import RLock, Pool
 
 import util
 
@@ -54,12 +54,18 @@ def main():
 def do_one_year(params):
 
     i, root, year, args = params
+
+    key_cols = ["date", "station"]
+    data_cols = ["density", "traffic_rate", "u", "v", "percent_rain"]
     
     if args.do_5min:
-        files = glob.glob(f"{root}/5min/????-{year}-5min.csv")
+        files = glob.glob(f"{root}/5min/{year}/????-{year}-5min.csv")
+        if not files:
+            warnings.warn("no files")
+            return
 
         def read_files(files):
-            
+
             for file in tqdm(
                     files,
                     desc=f"{year}, 5-minute",
@@ -68,16 +74,12 @@ def do_one_year(params):
                 
                 yield pd.read_csv(
                     file,
-                    usecols=['station',
-                             'date',
-                             'density',
-                             'traffic_rate',
-                             'u',
-                             'v',
-                             'percent_rain']
+                    usecols=key_cols+data_cols,
                 )
 
         df = pd.concat(read_files(files))
+
+        df.sort_values(key_cols, inplace=True)
 
         # df = df.pivot(
         #     index=["date"],
@@ -89,10 +91,17 @@ def do_one_year(params):
         if not os.path.exists(outdir):
             os.makedirs(outdir)
         outfile = f"{outdir}/{year}-5min.csv"
-        df.to_csv(outfile)
+        df.to_csv(
+            outfile,
+            columns=key_cols+data_cols,
+            index=False
+        )
 
     if args.do_daily:
-        files = glob.glob(f"{root}/daily/????-{year}-daily.csv")
+        files = glob.glob(f"{root}/daily/{year}/????-{year}-daily.csv")
+
+        key_cols = ["date", "period", "station"]
+        data_cols = ["period_length", "density_hours", "u", "v", "percent_missing", "percent_rain"]
 
         def read_files(files):
             for file in tqdm(
@@ -103,18 +112,12 @@ def do_one_year(params):
                 
                 yield pd.read_csv(
                     file,
-                    usecols=['station',
-                             'date',
-                             'period',
-                             'period_length',
-                             'density_hours',
-                             'u',
-                             'v',
-                             'percent_missing',
-                             'percent_rain']
+                    usecols=key_cols+data_cols
                 )
 
         df = pd.concat(read_files(files))
+
+        df.sort_values(key_cols, inplace=True)
 
         # df = df[df["percent_missing"] <= 0.2]
 
@@ -128,7 +131,11 @@ def do_one_year(params):
         if not os.path.exists(outdir):
             os.makedirs(outdir)
         outfile = f"{outdir}/{year}-daily.csv"
-        df.to_csv(outfile)
+        df.to_csv(
+            outfile,
+            columns=key_cols+data_cols,
+            index=False,
+        )
 
 
 if __name__ == "__main__":

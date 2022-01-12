@@ -366,7 +366,23 @@ def aggregate_single_station_year_to_daily(root, station, year, freq="5min"):
     time_periods = [
         {"name": "day", "start": "sunrise", "end": "sunset"},
         {"name": "night", "start": "sunset", "end": "next_sunrise"},
-        {"name": "calendar_day_utc", "start": "midnight_utc", "end": "next_midnight_utc"},
+        {"name": "utc_calendar_day", "start": "midnight_utc", "end": "next_midnight_utc"},
+    ]
+
+    key_cols = ["station", "date", "period"]
+    data_cols = [
+        "period_length",
+        "percent_missing",
+        "percent_filled",
+        "density_hours",
+        "density_hours_precip",
+        "traffic",
+        "traffic_precip",
+        "u",
+        "v",
+        "direction",
+        "speed",
+        "percent_rain"
     ]
 
     write_dfs = []
@@ -380,8 +396,6 @@ def aggregate_single_station_year_to_daily(root, station, year, freq="5min"):
         write_dfs.append(write_df)
 
         write_df["station"] = station
-        write_df["lat"] = lat
-        write_df["lon"] = lon
 
         for field in copy_fields:
             write_df[field] = day_info[field]
@@ -430,6 +444,10 @@ def aggregate_single_station_year_to_daily(root, station, year, freq="5min"):
                 write_df.loc[day, column] = rows[column].mean(skipna=True)
 
     out_df = pd.concat(write_dfs)
+
+    out_df.sort_values(key_cols, inplace=True)
+    out_df = out_df.reindex(key_cols + data_cols, axis=1)
+
     return out_df
 
 
