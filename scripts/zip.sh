@@ -1,8 +1,7 @@
 #!/bin/bash
 
 root=${1:-/data/cajun_results/cajun-complete}
-#dirs="scans 5min daily"
-dirs="5min daily"
+dirs="scans 5min daily"
 
 echo "root is $root"
 
