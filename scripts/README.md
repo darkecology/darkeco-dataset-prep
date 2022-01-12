@@ -23,15 +23,23 @@ root/
     |-- daily/
 ~~~~
 
-# Summary of Commands to Runs
+# Summary
+
+Run this sequence of commands to go from raw profiles to the prepared data set:
 
 ~~~ text
-# Do this first
 python compile_file_list.py --root /data/cajun_results/cajun-complete
+python summarize.py --root /data/cajun_results/cajun-complete # takes ~24 hours
+python combine_stations.py  --root /data/cajun_results/cajun-complete
+./zip.sh /data/cajun_results/cajun-complete
 
-# Summarize
-python summarize.py --root /data/cajun_results/cajun-complete # takes 3 hours/year of data
+# TODO: commands to zip profiles by year
+~~~
 
+Here are some more options for partial runs:
+
+
+~~~
 # Summarize selected stations/years
 python summarize.py --root /data/cajun_results/cajun-complete --stations KBOX KENX --years 2017 2018
 
@@ -50,7 +58,7 @@ year, and by station-year.
 python compile_file_list.py --root /data/cajun_results/cajun-complete
 ~~~
 
-This populates the `file_lists` directory, which looks like this:
+This populates the `file_lists` directory:
 
 ~~~ text
 
@@ -97,7 +105,6 @@ python summarize.py --root /data/cajun_results/cajun-complete --stations KBOX KE
 # Step 3: Aggregate by Station
 
 
-
 # Expanded Folder Stucture
 
 ~~~ text
@@ -114,7 +121,7 @@ root/
 |   |-- station_year_lists/
 |   |-- year_lists/
 |
-|-- scan_level/
+|-- scans/
 |   |-- KBOX-2016.csv
 |   |-- KBOX-2017.csv
 |   |-- KENX-2016.csv
@@ -132,17 +139,14 @@ root/
 |   |-- KENX-2016-daily.csv
 |   |-- KENX-2017-daily.csv
 |
-|-- allstations/
-|   |-- 5min/
-|   |   |-- 2016-5min.csv
-|   |   |-- 2017-5min.csv
-|   |
-|   |-- daily/
-|       |-- 2016-daily.csv
-|       |-- 2017-daily.csv
+|-- combined-5min/
+|   |-- 2016-5min.csv
+|   |-- 2017-5min.csv
+|
+|-- combined-daily/
+|   |-- 2016-daily.csv
+|   |-- 2017-daily.csv
 | 
-|-- allstations-daily/
-|   |-- 5min
 |-- setup.py
 |-- README
 
