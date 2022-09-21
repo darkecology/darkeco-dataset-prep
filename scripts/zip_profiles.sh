@@ -1,7 +1,8 @@
 #!/bin/bash
 
 root=${1:-/data/cajun_results/cajun-complete}
-VERSION=0.1.0
+VERSION=${2:-0.1.0}
+
 OUT=/scratch2/cajundata/$VERSION
 
 years=$(eval echo {1995..2019})

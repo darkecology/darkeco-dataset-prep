@@ -80,6 +80,11 @@ def aggregate_station_years_by_scan(
 
     print("***Aggregate by scan***")
     for year in years:
+
+        outdir = f"{root}/scans/{year}"
+        if not os.path.exists(outdir):
+            os.makedirs(outdir)
+        
         for station in stations:
 
             print(f" - {station}-{year}")
@@ -124,6 +129,10 @@ def resample_single_station_year(arg):
     resampled_df, column_names = util.load_and_resample_station_year(root, station, year)
     resampled_df.insert(3, "date", resampled_df.index)
 
+    outdir = f"{root}/{freq}/{year}"
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+
     outfile = f"{root}/{freq}/{year}/{station}-{year:4d}-{freq}.csv"
 
     resampled_df.to_csv(
@@ -140,8 +149,8 @@ def resample_station_years(root, stations, years, freq="5min"):
     print(f"***Resampling to {freq}***")
 
     outdir = f"{root}/{freq}"
-    if not os.path.exists(f"{root}/{freq}"):
-        os.makedirs(f"{root}/{freq}")
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
 
     stations = stations or util.get_stations(root)
     years = years or util.get_years(root)
@@ -166,6 +175,11 @@ def aggregate_single_station_year_to_daily_helper(arg):
     df = util.aggregate_single_station_year_to_daily(
         root, station, year, freq=freq
     )
+
+    outdir = f"{root}/daily/{year}"
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+
     outfile = f"{root}/daily/{year}/{station}-{year}-daily.csv"
     df.to_csv(outfile, index=False, float_format="%.6g")
     

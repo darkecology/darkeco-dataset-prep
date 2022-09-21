@@ -300,6 +300,10 @@ def load_and_resample_station_year(
         method="time", limit=limit, limit_direction=limit_direction
     )
 
+    # Handle direction specially: re-compute from u and v since it is a periodic quantity
+    df["direction"] = pol2cmp(np.arctan2(df["v"], df["u"]))
+
+    # Determine if a data point was filled
     missing_now = np.isnan(df["density"])
     df["filled"] = (missing_before & ~missing_now).astype("int")
 
