@@ -31,11 +31,12 @@ Run this sequence of commands to go from raw profiles to the prepared data set:
 
 #export ROOT=/data/cajun_results/cajun-complete
 export ROOT=/scratch2/cajun_results/cajun_1_0
+export VERSION=1.0.0
 
 python compile_file_list.py --root $ROOT
 python summarize.py --root $ROOT # takes ~24 hours
 python combine_stations.py  --root $ROOT
-./zip.sh $ROOT
+./zip.sh $ROOT $VERSION
 
 # TODO: commands to zip profiles by year
 ~~~
