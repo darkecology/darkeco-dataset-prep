@@ -28,10 +28,14 @@ root/
 Run this sequence of commands to go from raw profiles to the prepared data set:
 
 ~~~ text
-python compile_file_list.py --root /data/cajun_results/cajun-complete
-python summarize.py --root /data/cajun_results/cajun-complete # takes ~24 hours
-python combine_stations.py  --root /data/cajun_results/cajun-complete
-./zip.sh /data/cajun_results/cajun-complete
+
+#export ROOT=/data/cajun_results/cajun-complete
+export ROOT=/scratch2/cajun_results/cajun_1_0
+
+python compile_file_list.py --root $ROOT
+python summarize.py --root $ROOT # takes ~24 hours
+python combine_stations.py  --root $ROOT
+./zip.sh $ROOT
 
 # TODO: commands to zip profiles by year
 ~~~
@@ -41,12 +45,12 @@ Here are some more options for partial runs:
 
 ~~~
 # Summarize selected stations/years
-python summarize.py --root /data/cajun_results/cajun-complete --stations KBOX KENX --years 2017 2018
+python summarize.py --root $ROOT --stations KBOX KENX --years 2017 2018
 
 # Selected summarize steps (scan, resample, daily)
-python summarize.py --root /data/cajun_results/cajun-complete --actions scan      # ~2 hours/year
-python summarize.py --root /data/cajun_results/cajun-complete --actions resample  # ~35 min/year
-python summarize.py --root /data/cajun_results/cajun-complete --actions daily     # ~20 min/year
+python summarize.py --root $ROOT --actions scan      # ~2 hours/year
+python summarize.py --root $ROOT --actions resample  # ~35 min/year
+python summarize.py --root $ROOT --actions daily     # ~20 min/year
 ~~~
 
 # Step 1: Compile file lists
@@ -55,7 +59,7 @@ The first step is to compile lists of files organized by station, by
 year, and by station-year.
 
 ~~~ text
-python compile_file_list.py --root /data/cajun_results/cajun-complete
+python compile_file_list.py --root $ROOT
 ~~~
 
 This populates the `file_lists` directory:
@@ -99,7 +103,7 @@ files, e.g.:
 # Step 2: Summarize Profiles
 
 ~~~
-python summarize.py --root /data/cajun_results/cajun-complete --stations KBOX KENX --years 2018
+python summarize.py --root $ROOT --stations KBOX KENX --years 2018
 ~~~
 
 # Step 3: Aggregate by Station
