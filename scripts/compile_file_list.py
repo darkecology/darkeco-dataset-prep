@@ -19,6 +19,8 @@ def main():
         help="Profiles directory (default <root>/profiles)",
         default=None,
     )
+    parser.add_argument('--start', help="start year", type=int, required=True)
+    parser.add_argument('--end', help="end year", type=int, required=True)
 
     args = parser.parse_args()
 
@@ -35,7 +37,7 @@ def main():
     station_lists = defaultdict(list)
     year_lists = defaultdict(list)
     station_year_lists = defaultdict(list)
-    for year in range(1995, 2020):
+    for year in range(args.start, args.end):
         for month in range(1, 13):
             for day in range(1, 32):
                 datestr_folder = f"{year}/{month:02d}/{day:02d}"
