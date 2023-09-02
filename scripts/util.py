@@ -13,7 +13,7 @@ import nexrad
 
 key_cols = [
     "station",
-    "date",
+    "datetime",
 ]
 
 meta_cols = [
@@ -25,15 +25,15 @@ meta_cols = [
 ]
 
 data_cols = [
-    "density",
-    "density_precip",
+    "reflectivity",
+    "reflectivity_unfiltered",
     "traffic_rate",
-    "traffic_rate_precip",
+    "traffic_rate_unfiltered",
     "u",
     "v",
     "speed",
     "direction",
-    "percent_rain",
+    "fraction_rain",
     "rmse",
 ]
 
@@ -77,8 +77,8 @@ def aggregate_single_station_year_by_scan(
 
     df = pd.concat(dfs)
 
-    df = add_solar_elevation(df, df["date"], station)
-    df = add_period_info(df, pd.to_datetime(df['date']), station, year)
+    df = add_solar_elevation(df, df["datetime"], station)
+    df = add_period_info(df, pd.to_datetime(df['datetime']), station, year)
     column_names = key_cols + meta_cols + data_cols
 
     return df, column_names
@@ -106,7 +106,7 @@ def aggregate_profiles_to_scan_level(infiles):
     bin_width_km = 100 / 1000
 
     station_col = []
-    date_col = []
+    datetime_col = []
 
     # Read files, add profile data to df and metadata to meta_df
     scan_dfs = []
@@ -129,7 +129,7 @@ def aggregate_profiles_to_scan_level(infiles):
         second = infile[17:19]
 
         station_col.append(station)
-        date_col.append(f"{year}-{month}-{day} {hour}:{minute}:{second}Z")
+        datetime_col.append(f"{year}-{month}-{day}T{hour}:{minute}:{second}Z")
 
     df = pd.concat(scan_dfs)
 
@@ -139,7 +139,7 @@ def aggregate_profiles_to_scan_level(infiles):
     df["file_number"] = np.repeat(np.arange(len(infiles)), 30)
 
     meta_df = pd.DataFrame(
-        {"station": station_col, "date": date_col}
+        {"station": station_col, "datetime": datetime_col}
     )
 
     # Vertically integrated reflectivity (vir)
@@ -178,8 +178,8 @@ def aggregate_profiles_to_scan_level(infiles):
         df[col] *= df[weight_col]
 
     # For vertically integrated reflectivity, units cm2 / km2
-    df["density"] = df["linear_eta"] * bin_width_km
-    df["density_unfiltered"] = df["linear_eta_unfiltered"] * bin_width_km
+    df["reflectivity"] = df["linear_eta"] * bin_width_km
+    df["reflectivity_unfiltered"] = df["linear_eta_unfiltered"] * bin_width_km
 
     # For vertically integrated traffic rate, units cm2 / km / h
     df["traffic_rate"] = df["linear_eta"] * speed_km_h * bin_width_km
@@ -194,25 +194,24 @@ def aggregate_profiles_to_scan_level(infiles):
     for col, weight_col in weighted_average_cols:
         df[col] /= df[weight_col]
 
-    # Derived columns
-    df["density_precip"] = df["density_unfiltered"] - df["density"]
-    df["traffic_rate_precip"] = df["traffic_rate_unfiltered"] - df["traffic_rate"]
-
+    # Rename percent_rain --> fraction_rain
+    df.rename(columns={'percent_rain' : 'fraction_rain'}, inplace=True)
+    
     # Average track as compass bearing (degrees clockwise from north)
     df["direction"] = pol2cmp(np.arctan2(df["v"], df["u"]))
 
     # Keep selected columns
     df = df[
         [
-            "density",
-            "density_precip",
+            "reflectivity",
+            "reflectivity_unfiltered",
             "traffic_rate",
-            "traffic_rate_precip",
+            "traffic_rate_unfiltered",
             "u",
             "v",
             "speed",
             "direction",
-            "percent_rain",
+            "fraction_rain",
             "rmse",
         ]
     ]
@@ -242,8 +241,8 @@ def load_station_year(root, station, year, resampled=False, **kwargs):
 
     if os.path.exists(file):
         df = pd.read_csv(file, **kwargs)
-        df["date"] = pd.to_datetime(df["date"], utc=True)
-        df = df.set_index("date")
+        df["datetime"] = pd.to_datetime(df["datetime"], utc=True)
+        df = df.set_index("datetime")
         return df
 
     else:
@@ -293,7 +292,7 @@ def load_and_resample_station_year(
     # First resample with limit=2 and record missing entries
     df = resample(df, index, limit=2, limit_direction=limit_direction)
 
-    missing_before = np.isnan(df["density"])
+    missing_before = np.isnan(df["reflectivity"])
 
     # Now interpolate with the requested limit and record which values were filled
     df = df.interpolate(
@@ -304,7 +303,7 @@ def load_and_resample_station_year(
     df["direction"] = pol2cmp(np.arctan2(df["v"], df["u"]))
 
     # Determine if a data point was filled
-    missing_now = np.isnan(df["density"])
+    missing_now = np.isnan(df["reflectivity"])
     df["filled"] = (missing_before & ~missing_now).astype("int")
 
     # Add meta-data columns
@@ -327,26 +326,26 @@ def aggregate_single_station_year_to_daily(root, station, year, freq="5min"):
 
     integrate_fields = [
         # <input column name>, <output column name>
-        ["density", "density_hours"],
-        ["density_precip", "density_hours_precip"],
+        ["reflectivity", "reflectivity_hours"],
+        ["reflectivity_unfiltered", "reflectivity_hours_unfiltered"],
         ["traffic_rate", "traffic"],
-        ["traffic_rate_precip", "traffic_precip"],
+        ["traffic_rate_unfiltered", "traffic_unfiltered"],
     ]
 
     weighted_average_fields = [
         # <column name>, <weight column name>
-        ["u", "density"],
-        ["v", "density"],
-        ["direction", "density"],
-        ["speed", "density"],
+        ["u", "reflectivity"],
+        ["v", "reflectivity"],
+        ["direction", "reflectivity"],
+        ["speed", "reflectivity"],
     ]
 
     average_fields = [
         # Row format: <column name>
-        "percent_rain"
+        "fraction_rain"
     ]
 
-    copy_fields = ["date"]
+    copy_fields = ["date"] # copy from day_info
 
     last_df = None
     df = None
@@ -376,17 +375,17 @@ def aggregate_single_station_year_to_daily(root, station, year, freq="5min"):
     key_cols = ["station", "date", "period"]
     data_cols = [
         "period_length",
-        "percent_missing",
-        "percent_filled",
-        "density_hours",
-        "density_hours_precip",
+        "fraction_missing",
+        "fraction_filled",
+        "reflectivity_hours",
+        "reflectivity_hours_unfiltered",
         "traffic",
-        "traffic_precip",
+        "traffic_unfiltered",
         "u",
         "v",
         "direction",
         "speed",
-        "percent_rain"
+        "fraction_rain"
     ]
 
     write_dfs = []
@@ -418,16 +417,16 @@ def aggregate_single_station_year_to_daily(root, station, year, freq="5min"):
             rows = get_rows(dfs, start, end)
 
             # Skip if all missing (includes case when there are no rows at all)
-            if rows["density"].isna().all():
+            if rows["reflectivity"].isna().all():
                 continue
 
             # Add diagnostics fields
             n_rows = len(rows)
-            percent_missing = np.sum(np.isnan(rows["density"])) / n_rows
-            percent_filled = np.sum(rows["filled"]) / n_rows
+            fraction_missing = np.sum(np.isnan(rows["reflectivity"])) / n_rows
+            fraction_filled = np.sum(rows["filled"]) / n_rows
 
-            write_df.loc[day, "percent_missing"] = percent_missing
-            write_df.loc[day, "percent_filled"] = percent_filled
+            write_df.loc[day, "fraction_missing"] = fraction_missing
+            write_df.loc[day, "fraction_filled"] = fraction_filled
 
             # Perform integration on specified fields
             for spec in integrate_fields:

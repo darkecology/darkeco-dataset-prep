@@ -127,7 +127,7 @@ def resample_single_station_year(arg):
         return
         
     resampled_df, column_names = util.load_and_resample_station_year(root, station, year)
-    resampled_df.insert(3, "date", resampled_df.index)
+    resampled_df.insert(3, "datetime", resampled_df.index)
 
     outdir = f"{root}/{freq}/{year}"
     if not os.path.exists(outdir):
@@ -138,7 +138,7 @@ def resample_single_station_year(arg):
     resampled_df.to_csv(
         outfile,
         columns=column_names,
-        date_format="%Y-%m-%d %H:%M:%SZ",
+        date_format="%Y-%m-%dT%H:%M:%SZ",
         float_format="%.4f",
         index=False,
     )

@@ -20,7 +20,7 @@ def main():
     )
     parser.add_argument("--years", nargs="+", type=int, help="years to process", default=None)
     parser.add_argument(
-        "--min", help="do 5min data", dest="do_5min", action="store_true"
+        "--5min", help="do 5min data", dest="do_5min", action="store_true"
     )
     parser.add_argument(
         "--no-5min", help="don't do 5min data", dest="do_5min", action="store_false"
@@ -54,11 +54,12 @@ def main():
 def do_one_year(params):
 
     i, root, year, args = params
-
-    key_cols = ["date", "station"]
-    data_cols = ["density", "traffic_rate", "u", "v", "percent_rain"]
     
     if args.do_5min:
+        
+        key_cols = ["datetime", "station"]
+        data_cols = ["reflectivity", "traffic_rate", "u", "v", "fraction_rain"]
+        
         files = glob.glob(f"{root}/5min/{year}/????-{year}-5min.csv")
         if not files:
             warnings.warn("no files")
@@ -84,7 +85,7 @@ def do_one_year(params):
         # df = df.pivot(
         #     index=["date"],
         #     columns="station",
-        #     values=["density", "traffic_rate", "u", "v", "percent_rain"],
+        #     values=["reflectivity", "traffic_rate", "u", "v", "fraction_rain"],
         # )
 
         outdir = f"{root}/combined-5min"
@@ -101,7 +102,7 @@ def do_one_year(params):
         files = glob.glob(f"{root}/daily/{year}/????-{year}-daily.csv")
 
         key_cols = ["date", "period", "station"]
-        data_cols = ["period_length", "density_hours", "u", "v", "percent_missing", "percent_rain"]
+        data_cols = ["period_length", "reflectivity_hours", "u", "v", "fraction_missing", "fraction_rain"]
 
         def read_files(files):
             for file in tqdm(
@@ -119,12 +120,12 @@ def do_one_year(params):
 
         df.sort_values(key_cols, inplace=True)
 
-        # df = df[df["percent_missing"] <= 0.2]
+        # df = df[df["fraction_missing"] <= 0.2]
 
         # df = df.pivot(
         #     index=["date", "period"],
         #     columns="station",
-        #     values=["density_hours", "u", "v", "percent_rain"],
+        #     values=["reflectivity_hours", "u", "v", "fraction_rain"],
         # )
 
         outdir = f"{root}/combined-daily"
