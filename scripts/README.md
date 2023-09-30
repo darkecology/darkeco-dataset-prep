@@ -37,8 +37,8 @@ python compile_file_list.py --root $ROOT --start 1995 --end 2023
 python summarize.py --root $ROOT # takes ~24 hours
 python combine_stations.py  --root $ROOT
 ./zip.sh $ROOT $VERSION
+./zip_profiles.sh $ROOT $VERSION
 
-# TODO: commands to zip profiles by year
 ~~~
 
 Here are some more options for partial runs:
