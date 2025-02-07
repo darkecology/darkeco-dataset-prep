@@ -166,7 +166,7 @@ def aggregate_single_station_year_to_daily_helper(arg):
     root, station, year, freq = arg
 
     print(f"{station}-{year}")
-    if not os.path.exists(f"{root}/{freq}/{year}/{station}-{year}-5min.csv"):
+    if not os.path.exists(f"{root}/{freq}/{year}/{station}-{year}-{freq}.csv"):
         warnings.warn(
             f"{root}/{freq}/{year}/{station}-{year}-{freq}.txt not found, must aggregate to scan level and resample first"
         )
@@ -176,11 +176,11 @@ def aggregate_single_station_year_to_daily_helper(arg):
         root, station, year, freq=freq
     )
 
-    outdir = f"{root}/daily/{year}"
+    outdir = f"{root}/daily-single/{year}"
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    outfile = f"{root}/daily/{year}/{station}-{year}-daily.csv"
+    outfile = f"{root}/daily-single/{year}/{station}-{year}-daily.csv"
     df.to_csv(outfile, index=False, float_format="%.6g")
     
     
@@ -188,8 +188,8 @@ def aggregate_station_years_to_daily(root, stations, years, freq="5min"):
 
     print("***Aggregating to daily***")
 
-    if not os.path.exists(f"{root}/daily"):
-        os.makedirs(f"{root}/daily")
+    if not os.path.exists(f"{root}/daily-single"):
+        os.makedirs(f"{root}/daily-single")
 
     stations = stations or util.get_stations(root)
     years = years or util.get_years(root)

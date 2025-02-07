@@ -35,7 +35,7 @@ def main():
         action="store_false",
     )
 
-    parser.set_defaults(do_5min=True, do_daily=True)
+    parser.set_defaults(do_5min=False, do_daily=True)
     args = parser.parse_args()
 
     root = args.root
@@ -58,8 +58,6 @@ def do_one_year(params):
     if args.do_5min:
         
         key_cols = ["datetime", "station"]
-        data_cols = ["reflectivity", "traffic_rate", "u", "v", "fraction_rain"]
-        
         files = glob.glob(f"{root}/5min/{year}/????-{year}-5min.csv")
         if not files:
             warnings.warn("no files")
@@ -73,10 +71,7 @@ def do_one_year(params):
                     lock_args=None,
                     position=i):
                 
-                yield pd.read_csv(
-                    file,
-                    usecols=key_cols+data_cols,
-                )
+                yield pd.read_csv(file)
 
         df = pd.concat(read_files(files))
 
@@ -88,18 +83,14 @@ def do_one_year(params):
         #     values=["reflectivity", "traffic_rate", "u", "v", "fraction_rain"],
         # )
 
-        outdir = f"{root}/combined-5min"
+        outdir = f"{root}/5min-combined"
         if not os.path.exists(outdir):
             os.makedirs(outdir)
         outfile = f"{outdir}/{year}-5min.csv"
-        df.to_csv(
-            outfile,
-            columns=key_cols+data_cols,
-            index=False
-        )
+        df.to_csv(outfile, index=False)
 
     if args.do_daily:
-        files = glob.glob(f"{root}/daily/{year}/????-{year}-daily.csv")
+        files = glob.glob(f"{root}/daily-single/{year}/????-{year}-daily.csv")
 
         key_cols = ["date", "period", "station"]
         data_cols = ["period_length", "reflectivity_hours", "u", "v", "fraction_missing", "fraction_rain"]
@@ -111,10 +102,7 @@ def do_one_year(params):
                     lock_args=None,
                     position=i):
                 
-                yield pd.read_csv(
-                    file,
-                    usecols=key_cols+data_cols
-                )
+                yield pd.read_csv(file)
 
         df = pd.concat(read_files(files))
 
@@ -128,15 +116,11 @@ def do_one_year(params):
         #     values=["reflectivity_hours", "u", "v", "fraction_rain"],
         # )
 
-        outdir = f"{root}/combined-daily"
+        outdir = f"{root}/daily"
         if not os.path.exists(outdir):
             os.makedirs(outdir)
         outfile = f"{outdir}/{year}-daily.csv"
-        df.to_csv(
-            outfile,
-            columns=key_cols+data_cols,
-            index=False,
-        )
+        df.to_csv(outfile, index=False)
 
 
 if __name__ == "__main__":
