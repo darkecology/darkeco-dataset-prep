@@ -1,0 +1,121 @@
+---
+title: "Cajun bioRad comparson"
+output: 
+  pdf_document:
+    latex_engine: pdflatex # Use pdflatex as the LaTeX engine
+---
+
+# Setup
+
+```{r, results="hide"}
+library(bioRad)
+library(readr)
+
+# Save plot as pdf
+save_pdf <- function(filename, width, height) {
+  invisible({
+    dev.copy(pdf, filename, width=width, height=height)
+    dev.off()    
+  })
+}
+
+```
+
+
+# Visualize profiles
+
+Load and view profiles
+```{r}
+
+
+# Get filenames of selected vertical profiles
+root = "../data-1.0.0"
+station = "KBGM"
+year = 2019
+month = 10
+vpfiles <- list.files(sprintf("%s/profiles/%04d/%02d", root, year, month), 
+                      recursive = T, full.names = T, pattern = station) 
+
+# Read profiles with bioRad's `read_cajun` function
+vps <- lapply(vpfiles, read_cajun)
+
+# Bind profiles into a time series
+vpts <- bind_into_vpts(vps)
+
+# Disable sd_vvp thresholding (standard for S-band)
+sd_vvp_threshold(vpts)=0
+
+# Add location metadata (TODO: look up in metadata)
+stations = read_csv(sprintf("%s/meta/nexrad-stations.csv", root))
+st = stations[stations$callsign == station, ]
+vpts$attributes$where$lat = st$lat
+vpts$attributes$where$lon = st$lon
+
+```
+
+Visualize one day
+```{r fig.width=9, fig.height=4.5}
+start_date <- "2019-10-18 22:00"
+end_date <- "2019-10-19 12:00"
+night_vpts <- filter_vpts(vpts, min = start_date, max = end_date)
+night_vpts <- regularize_vpts(night_vpts) # this helps to see if there is missing data
+plot(night_vpts, xaxt = "n")
+
+tick_positions <- axTicks(1)
+tick_dates <- as.POSIXct(axTicks(1), origin = "1970-01-01", tz = "UTC")
+axis.POSIXct(1, x = tick_dates, format = "%h %d %H:%M")
+
+save_pdf('plots/vis/day.pdf', 9, 4.5)
+```
+
+
+Visualize one month
+```{r, fig.width=6.5, fig.height=7}
+
+source('plot.vpts.R') # modified plot.vpts function
+
+for (quantity in c("eta", "dbz", "DBZH")) {
+  # Define start and end dates
+  start_date <- as.POSIXct("2019-10-01 18:00")
+  end_date <- as.POSIXct("2019-10-31 18:00")
+  
+  # Generate 8-day periods
+  dates <- seq(start_date, end_date, by = "8 days")
+  dates <- c(dates, end_date)  # Ensure we include the last day of the month
+  
+  # Set up the layout for 4 rows of subplots
+  layout(matrix(c(1:4, rep(5, 4)), 4, 2), widths=c(4.25, 0.4), heights=rep(4, 4)) 
+  par(mar = c(2, 4, 1, 0))
+
+  #par(mfrow = c(4, 1), mar = c(2, 4, 2, 1))  # 4 rows, 1 column
+  par(oma = c(0, 0, 0, 3))
+  
+  # Loop through each period and plot
+  for (i in seq_along(dates[-length(dates)])) {
+    # Define period start and end
+    period_start <- dates[i]
+    period_end <- dates[i+1]
+    
+    xlim <- c(dates[i], dates[i] + 8 * 24 * 60 * 60) # exactly 8 days
+    
+    # Filter data for the period
+    filtered_vpts <- filter_vpts(vpts, min = period_start, max = period_end)
+    
+    # Regularize and plot
+    args <- plot.vpts(regularize_vpts(filtered_vpts), quantity = quantity,
+         xlim = xlim, xlab = "", main = "", barbs = F)
+  }
+  
+  par(mar = c(0, 0, 0, 0))
+  units = switch(quantity, "dbz" = "dBZ", "DBZH" = "dBZ", "eta" = expression(eta))
+  plot.new()
+  fields::image.plot(col = args$col, zlim = args$zlim, axis.args = args$axis.args,
+                     legend.only = TRUE, legend.width = 15, 
+                     legend.args = list(text = units, side = 1, line = 0.4, cex = 0.8))
+  
+  #title = switch(quantity, "dbz" = "Biology reflectivity factor (dBZ)", "DBZH" = "Total reflectivity factor (total, dBZ)")
+  #mtext(title, outer = TRUE, cex = 0.9)
+  
+  save_pdf(sprintf('plots/vis/%s.pdf', quantity), 6.5, 7)
+}
+```

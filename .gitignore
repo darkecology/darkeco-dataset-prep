@@ -5,3 +5,5 @@ data
 **~
 **.idea
 **.egg-info
+**.Rhistory
+validation/plots

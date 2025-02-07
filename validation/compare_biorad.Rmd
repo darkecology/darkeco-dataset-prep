@@ -1,0 +1,500 @@
+---
+title: "Cajun bioRad comparson"
+output: 
+  pdf_document:
+    latex_engine: pdflatex # Use pdflatex as the LaTeX engine
+---
+
+# Setup
+
+```{r, results="hide"}
+library(bioRad)
+library(readr)
+
+# Override the function in the package namespace
+source("plot.vpi.R")
+setMethod("plot", signature(x = "vpi"), plot.vpi)
+
+```
+
+# Utilities
+
+```{r, echo=FALSE, results="hide"}
+
+# Align two dfs based on common values in datetime column
+align_dfs <- function(df1, df2) {
+  
+  # truncate datetime columns to minutes before matching
+  df1$datetime <- as.POSIXct(format(df1$datetime, "%Y-%m-%d %H:%M"), tz = "UTC")
+  df2$datetime <- as.POSIXct(format(df2$datetime, "%Y-%m-%d %H:%M"), tz = "UTC")
+  
+  shared <- as.POSIXct(intersect(df1$datetime,
+                                 df2$datetime),
+                     origin = "1970-01-01",
+                     tz = "UTC")
+  df1 <- df1[df1$datetime %in% shared, ]
+  df2 <- df2[df2$datetime %in% shared, ]
+  list(df1=df1, df2=df2)
+}
+
+# Plot field from two vpis as time series
+compare_as_timeseries <- function(df1, df2, field, ...) {
+  # Time series comparison plot
+  plot(df1, quantity=field, ...)
+  points(df2$datetime, df2[[field]], type = 'l', col = 'red', ...)
+}
+
+# Scatter plot of field from two vpis
+compare_as_scatter <- function(df1, df2, field,  field2 = NA, name = NULL,
+                               df_names = c("vol2bird", "dark ecology"), 
+                               xlab = NULL, ylab = NULL, main = NULL, fit = FALSE,
+                               ...) {
+  
+  field1 = field
+  field2 = ifelse(is.na(field2), field1, field2)
+  
+  range_limits <- range(c(df1[[field1]], df2[[field2]]), na.rm = TRUE)
+
+  name = ifelse(is.null(name), field, name)
+  xlab = ifelse(is.null(xlab), df_names[1], xlab)
+  ylab = ifelse(is.null(ylab), df_names[2], ylab)
+  main = ifelse(is.null(main), name, main)
+  
+  plot(df1[[field1]], 
+       df2[[field2]], 
+       xlab = xlab, 
+       ylab = ylab, 
+       main = main, 
+       asp = 1, 
+       xlim = range_limits, 
+       ylim = range_limits, ...)
+  
+  # 1:1 line
+  abline(a=0, b=1)
+  
+  if (fit) {
+    # Fit and plot best fit line with zero intercept
+    fit <- lm(df2[[field2]] ~ 1 + df1[[field1]], na.action = na.exclude)
+    intercept <- coef(fit)[1]
+    slope <- coef(fit)[2]
+    abline(fit, lty=2)
+  
+    eq <- paste("y = ", format(round(intercept, 2), nsmall=2), " + ", format(round(slope, 2), nsmall=2), "x", sep="")
+    legend("topleft", legend=c("1:1", eq), lty=c(1, 2), cex=0.8, inset=0.02)
+    #legend("topleft", legend=c("1:1", paste("Slope ", format(round(slope, 2), nsmall=2))), lty=c(1, 2), cex=0.8, inset=0.02)
+  }
+}
+
+# Save plot as pdf
+save_pdf <- function(filename, width, height) {
+  invisible({
+    dev.copy(pdf, filename, width=width, height=height)
+    dev.off()    
+  })
+}
+```
+
+# Cajun vs. bioRad vertical integration
+
+Load cajun profiles and integrate to vpis with bioRad
+```{r}
+
+# Set some parameters for comparison
+start_date <- "2019-10-01 12:00"
+end_date <- "2019-10-16 12:00"
+
+# load vp filenames
+root = "../data-1.0.0"
+vpfiles <- list.files(sprintf("%s/profiles/2019/10", root), 
+                      recursive = T, full.names = T, pattern = "KBGM") # load data
+vps <- lapply(vpfiles,read_cajun)
+# bind profiles into a time series
+vpts<- bind_into_vpts(vps)
+
+# add location metadata
+stations = read_csv(sprintf("%s/meta/nexrad-stations.csv", root))
+KGBM = stations[stations$callsign == "KBGM", ]
+vpts$attributes$where$lat = KBGM$lat
+vpts$attributes$where$lon = KBGM$lon
+
+# disable sd_vvp thresholding
+sd_vvp_threshold(vpts)=0
+
+# integrate over height and store as vertically integrated profile (vpi),
+# for a smaller time period:  
+vpi <- integrate_profile(filter_vpts(vpts, min=start_date, max=end_date))
+
+# load pre-generated vpi:
+vpi_cajun <- read_csv("../data-1.0.0/scans/2019/KBGM-2019.csv")
+#vpi_cajun <- read_csv("../data-1.0.0/5min/2019/KBGM-2019-5min.csv")
+
+# Align to common times
+ret = align_dfs(vpi, vpi_cajun)
+vpi = ret$df1
+vpi_cajun = ret$df2
+```
+Compare as time series
+
+```{r, fig.width=8, fig.height=3, message=FALSE, warning=FALSE}
+width=8
+height=3
+
+plot(vpi, quantity = "vir", ylab = expression("reflectivity [cm"^2 * "/km"^2 * "]"), main = "Reflectivity")
+points(vpi_cajun$datetime, vpi_cajun$reflectivity, type='l', col='red')
+save_pdf("plots/vpi/reflectivity", width=width, height=height)
+
+plot(vpi, quantity = "rtr", ylab = expression("traffic rate [cm"^2 * "/km/h]"), main = "Traffic rate")
+points(vpi_cajun$datetime, vpi_cajun$traffic_rate, type='l', col='red')
+save_pdf("plots/vpi/traffic_rate.pdf", width=width, height=height)
+
+plot(vpi, quantity="ff", ylab = "speed [m/s]", main = "Ground speed")
+points(vpi_cajun$datetime, vpi_cajun$speed, type='l', col='red')
+save_pdf("plots/vpi/speed.pdf", width=width, height=height)
+
+plot(vpi, quantity="dd", ylab = "direction [deg]", main = "Direction")
+points(vpi_cajun$datetime, vpi_cajun$direction, type='l', col='red')
+save_pdf("plots/vpi/direction.pdf", width=width, height=height)
+
+plot(vpi, quantity="u", ylab = "u [m/s]", main = "East-west component of velocity")
+points(vpi_cajun$datetime, vpi_cajun$u, type='l', col='red')
+save_pdf("plots/vpi/u.pdf", width=width, height=height)
+
+plot(vpi, quantity="v", ylab = "v [m/s]", main = "North-south component of velocity")
+points(vpi_cajun$datetime, vpi_cajun$v, type='l', col='red')
+save_pdf("plots/vpi/v.pdf", width=width, height=height)
+```
+
+Compare as scatter plots
+
+```{r fig.width=5, fig.height=5}
+width=5
+height=5
+
+compare_as_scatter(vpi, vpi_cajun, "vir", field2 = "reflectivity", name = "reflectivity")
+save_pdf("plots/vpi/reflectivity_scatter.pdf", width=width, height=height)
+
+compare_as_scatter(vpi, vpi_cajun, "rtr", field2 = "traffic_rate", name = "traffic rate")
+save_pdf("plots/vpi/traffic_rate_scatter.pdf", width=width, height=height)
+
+compare_as_scatter(vpi, vpi_cajun, "ff", field2 = "speed", name = "speed")
+save_pdf("plots/vpi/speed_scatter.pdf", width=width, height=height)
+
+compare_as_scatter(vpi, vpi_cajun, "dd", field2="direction", name = "direction")
+save_pdf("plots/vpi/direction_scatter.pdf", width=width, height=height)
+
+compare_as_scatter(vpi, vpi_cajun, "u")
+save_pdf("plots/vpi/u_scatter.pdf", width=width, height=height)
+
+compare_as_scatter(vpi, vpi_cajun, "v")
+save_pdf("plots/vpi/v_scatter.pdf", width=width, height=height)
+
+```
+
+```{r}
+# All linear correlations are exactly 1
+print(cor(vpi$vir, vpi_cajun$reflectivity))
+print(cor(vpi$rtr, vpi_cajun$traffic_rate))
+print(cor(vpi$ff, vpi_cajun$speed))
+print(cor(vpi$dd, vpi_cajun$direction))
+print(cor(vpi$u, vpi_cajun$u))
+print(cor(vpi$v, vpi_cajun$v))
+
+rmae <- function(a, b) {
+  return (sum(abs(a-b)/a))
+}
+
+# Show relative MAE
+print(rmae(vpi$vir, vpi_cajun$reflectivity))
+print(rmae(vpi$rtr, vpi_cajun$traffic_rate))
+print(rmae(vpi$ff, vpi_cajun$speed))
+print(rmae(vpi$dd, vpi_cajun$direction))
+print(rmae(vpi$u, vpi_cajun$u))
+print(rmae(vpi$v, vpi_cajun$v))
+
+```
+# Cajun vs. vol2bird profiles
+
+Read vol2bird and cajun profiles and integrate to vpis
+```{r}
+# Read vol2bird profiles
+vpts_vol2bird <- filter_vpts(read_vpts("KBGM2019.csv.gz"), min=start_date, max=end_date)
+sd_vvp_threshold(vpts_vol2bird) <- 0
+
+# Vertically integrate vol2bird and cajun profiles
+vpi_bioRad_vol2bird_unfiltered <- integrate_profile(vpts_vol2bird)
+vpi_bioRad_cajun_unfiltered <- integrate_profile(vpts)
+
+
+ret = align_dfs(vpi_bioRad_vol2bird_unfiltered,
+                vpi_bioRad_cajun_unfiltered)
+vpi_bioRad_vol2bird_unfiltered = ret$df1
+vpi_bioRad_cajun_unfiltered = ret$df2
+```
+
+Also create a filtered data set where velocity fields are set to NA where reflectivity is too low
+```{r}
+vpi_bioRad_vol2bird = vpi_bioRad_vol2bird_unfiltered
+vpi_bioRad_cajun = vpi_bioRad_cajun_unfiltered
+indices = vpi_bioRad_vol2bird_unfiltered$vir < 100
+for (field in c("dd", "ff", "u", "v")) {
+  vpi_bioRad_vol2bird[[field]][indices] <- NA
+  vpi_bioRad_cajun[[field]][indices] <- NA
+}
+```
+
+
+Selected time series comparisons
+```{r, fig.width=6.5, fig.height=8}
+
+width = 6.5
+height = 8
+vlim = c(-20, 20)
+
+mylegend <- function() legend("topright", legend = c("vol2bird", "dark ecology"), col = c("black", "red"), lty = 1, cex = 0.7)
+
+par(mfcol=c(6, 1), mar = c(1, 5, 1, 1), oma = c(3, 1, 1, 1))
+compare_as_timeseries(vpi_bioRad_vol2bird_unfiltered, 
+                      vpi_bioRad_cajun_unfiltered, 
+                      "vir",
+                      xaxt = "n",
+                      ylab = expression("reflectivity (cm"^2 * "/km"^2 * ")"),
+                      ylim = c(0, 4000),
+                      main = NULL)
+mylegend()
+
+compare_as_timeseries(vpi_bioRad_vol2bird_unfiltered, 
+                      vpi_bioRad_cajun_unfiltered, 
+                      "rtr",
+                      xaxt = "n",
+                      ylim = c(0, 200000),
+                      ylab = expression("traffic rate (cm"^2 * "/km/h)"),
+                      main = NULL)
+
+compare_as_timeseries(vpi_bioRad_vol2bird_unfiltered, 
+                      vpi_bioRad_cajun_unfiltered, 
+                      "u",
+                      xaxt = "n",
+                      ylab = "u (m/s)", 
+                      main = NULL, 
+                      ylim = vlim)
+
+compare_as_timeseries(vpi_bioRad_vol2bird_unfiltered, 
+                      vpi_bioRad_cajun_unfiltered, 
+                      "v", 
+                      xaxt = "n",
+                      ylab = "v (m/s)",
+                      main = NULL, 
+                      ylim = vlim)
+
+compare_as_timeseries(vpi_bioRad_vol2bird, 
+                      vpi_bioRad_cajun, 
+                      "u",
+                      xaxt = "n",
+                      ylab = "u (m/s, filtered)", 
+                      main = NULL, 
+                      ylim = vlim)
+
+compare_as_timeseries(vpi_bioRad_vol2bird, 
+                      vpi_bioRad_cajun, 
+                      "v",
+                      ylab = "v (m/s)", 
+                      main = NULL, 
+                      ylim = vlim)
+
+
+save_pdf("plots/profiles/composite.pdf", width = width, height = height)
+```
+
+Compare as time series: single plot versions with filtering of velocity variables
+```{r, fig.width=9, fig.height=3}
+
+width = 9
+height = 3
+
+compare_as_timeseries(vpi_bioRad_vol2bird, 
+                      vpi_bioRad_cajun, 
+                      "vir", 
+                      ylab = expression("reflectivity (cm"^2 * "/km"^2 * ")"), 
+                      main = "Reflectivity")
+mylegend()
+save_pdf("plots/profiles/vir.pdf", width = width, height = height)
+
+compare_as_timeseries(vpi_bioRad_vol2bird, 
+                      vpi_bioRad_cajun, 
+                      "rtr", 
+                      ylab = expression("traffic rate (cm"^2 * "/km/h)"), 
+                      main = "Traffic rate")
+mylegend()
+save_pdf("plots/profiles/rtr.pdf", width = width, height = height)
+
+compare_as_timeseries(vpi_bioRad_vol2bird, 
+                      vpi_bioRad_cajun, 
+                      "ff", 
+                      ylab = "speed (m/s)", 
+                      main = "Ground speed")
+mylegend()
+save_pdf("plots/profiles/ff.pdf", width = width, height = height)
+
+compare_as_timeseries(vpi_bioRad_vol2bird, 
+                      vpi_bioRad_cajun, 
+                      "dd", 
+                      ylab = "direction (deg)", 
+                      main = "Direction", 
+                      ylim = c(0, 360))
+mylegend()
+save_pdf("plots/profiles/dd.pdf", width = width, height = height)
+
+compare_as_timeseries(vpi_bioRad_vol2bird, 
+                      vpi_bioRad_cajun, 
+                      "u", 
+                      ylab = "u (m/s)", 
+                      main = "East-west component of velocity", 
+                      ylim = vlim)
+mylegend()
+save_pdf("plots/profiles/u.pdf", width = width, height = height)
+
+compare_as_timeseries(vpi_bioRad_vol2bird, 
+                      vpi_bioRad_cajun, 
+                      "v", 
+                      ylab = "v (m/s)", 
+                      main = "North-south component of velocity", 
+                      ylim = vlim)
+mylegend()
+save_pdf("plots/profiles/v.pdf", width = width, height = height)
+
+```
+
+Compare as scatter plots
+```{r, fig.width=5, fig.height=5}
+
+width = 5
+height = 5
+
+# Compare different fields as scatter plots
+compare_as_scatter(vpi_bioRad_vol2bird, 
+                   vpi_bioRad_cajun, 
+                   "vir", 
+                   name = "reflectivity")
+save_pdf("plots/profiles/vir_scatter.pdf", width = width, height = height)
+
+compare_as_scatter(vpi_bioRad_vol2bird, 
+                   vpi_bioRad_cajun, 
+                   "rtr",
+                   name = "traffic rate")
+save_pdf("plots/profiles/rtr_scatter.pdf", width = width, height = height)
+
+compare_as_scatter(vpi_bioRad_vol2bird, vpi_bioRad_cajun, "u")
+save_pdf("plots/profiles/u_scatter.pdf", width = width, height = height)
+
+compare_as_scatter(vpi_bioRad_vol2bird, vpi_bioRad_cajun, "v")
+save_pdf("plots/profiles/v_scatter.pdf", width = width, height = height)
+
+compare_as_scatter(vpi_bioRad_vol2bird, 
+                   vpi_bioRad_cajun, 
+                   "ff", 
+                   name = "ground speed")
+save_pdf("plots/profiles/ff_scatter.pdf", width = width, height = height)
+
+compare_as_scatter(vpi_bioRad_vol2bird, 
+                   vpi_bioRad_cajun, 
+                   "dd", 
+                   name = "direction")
+save_pdf("plots/profiles/dd_scatter.pdf", width = width, height = height)
+```
+Single plot version
+
+```{r, fig.width=6.5, fig.height=4.5}
+
+width = 6.5
+height = 4.5
+
+par(mfcol=c(2, 3), mar = c(2.5, 2, 1.5, 1), oma = c(4, 4, 1, 1))
+col <- rgb(0, 0, 1, alpha = 0.4)
+
+# shorthand
+vol2bird <- vpi_bioRad_vol2bird_unfiltered
+cajun <- vpi_bioRad_cajun_unfiltered
+
+# Compare different fields as scatter plots
+compare_as_scatter(vol2bird, cajun, "vir",
+                   name = expression(bold("reflectivity (cm"^2 * "/km"^2 * ")")),
+                   xlab = "", ylab = "", pch = 21, col = col, cex = 0.8)
+
+compare_as_scatter(vol2bird, cajun, "rtr", 
+                   name = expression(bold("traffic rate (cm"^2 * "/km/h)")),
+                   xlab = "", ylab = "", pch = 21, col = col, cex = 0.8)
+
+compare_as_scatter(vol2bird, cajun, "u",
+                   name = "u (m/s)",
+                   xlab = "", ylab = "", pch = 21, col = col, cex = 0.8)
+
+compare_as_scatter(vol2bird, cajun, "v",
+                   name = "v (m/s)",
+                   xlab = "", ylab = "", pch = 21, col = col, cex = 0.8)
+
+# Filtered versions
+compare_as_scatter(vpi_bioRad_vol2bird, 
+                   vpi_bioRad_cajun, 
+                   "u",
+                   name = "u (m/s, filtered)",
+                   xlab = "", ylab = "", pch = 21, col = col, cex = 0.8)
+
+compare_as_scatter(vpi_bioRad_vol2bird, 
+                   vpi_bioRad_cajun, 
+                   "v",
+                   name = "v (m/s, filtered)",
+                   xlab = "", ylab = "", pch = 21, col = col, cex = 0.8)
+
+# compare_as_scatter(vol2bird, cajun, "ff", 
+#                    name = "ground speed [m/s]",
+#                    xlab = "", ylab = "", pch = 21, col = col, cex = 0.8)
+# 
+# compare_as_scatter(vol2bird, cajun, "dd", 
+#                    name = "direction [deg]",
+#                    xlab = "", ylab = "", pch = 21, col = col, cex = 0.8)
+
+# Add overall labels
+mtext("vol2bird", side = 1, outer = TRUE, line = 2, cex = 1.3)
+mtext("Dark Ecology", side = 2, outer = TRUE, line = 2, cex = 1.3)
+
+save_pdf("plots/profiles/composite_scatter.pdf", width = width, height = height)
+
+```
+
+## Compute some statistics
+
+Choose whether to filter or not
+```{r}
+filtering <- FALSE
+vol2bird <- if(filtering) vpi_bioRad_vol2bird else vpi_bioRad_vol2bird_unfiltered
+cajun    <- if(filtering) vpi_bioRad_cajun    else vpi_bioRad_cajun_unfiltered
+```
+
+Compute linear correlation between fields
+```{r}
+for (field in c("vir", "rtr", "u", "v", "ff", "dd")) {
+  print(paste(field, cor(vol2bird[[field]], cajun[[field]], use="complete.obs")))
+}
+```
+
+Compute linear model fits
+```{r}
+
+fit <- lm(cajun$vir ~ 0 + vol2bird$vir, na.action = na.exclude)
+print(summary(fit))
+
+fit <- lm(cajun$rtr ~ 0 + vol2bird$rtr, na.action = na.exclude)
+print(summary(fit))
+
+fit <- lm(cajun$u ~ 1 + vol2bird$u, na.action = na.exclude)
+print(summary(fit))
+
+fit <- lm(cajun$v ~ 1 + vol2bird$v, na.action = na.exclude)
+print(summary(fit))
+
+fit <- lm(cajun$ff ~ 1 + vol2bird$ff, na.action = na.exclude)
+print(summary(fit))
+
+fit <- lm(cajun$dd ~ 1 + vol2bird$dd, na.action = na.exclude)
+print(summary(fit))
+```
