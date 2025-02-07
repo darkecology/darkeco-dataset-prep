@@ -37,7 +37,7 @@ data_cols = [
     "rmse",
 ]
 
-
+VEL_MAX = 50  # Maximum velocity in m/s
 
 warnings.formatwarning = lambda msg, *args, **kwargs: str(msg) + "\n"
 
@@ -160,6 +160,13 @@ def aggregate_profiles_to_scan_level(infiles):
     #      filled by the total scattering area of targets in the column
     #      above it. I.e., zap all the birds so they fall to the
     #      ground, and measure how much ground space is filled up.)
+
+    # Speeds > VEL_MAX are considered errors. Set all velocity related fields to NaN if this occurs
+    inds = df["speed"] > VEL_MAX
+    df.loc[inds, 'u'] = np.nan
+    df.loc[inds, 'v'] = np.nan
+    df.loc[inds, 'speed'] = np.nan
+    df.loc[inds, 'rmse'] = np.nan
 
     # Speed converted from m/s to km/h
     speed_km_h = df["speed"] * (1 / 1000) * (3600 / 1)
