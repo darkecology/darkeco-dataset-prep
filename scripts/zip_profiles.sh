@@ -3,7 +3,7 @@
 root=${1:-/scratch2/cajun_results/cajun_1_0}
 VERSION=${2:-1.0.0}
 
-OUT=/scratch2/cajundata/$VERSION
+OUT=/scratch2/darkecodata/$VERSION
 
 years=$(eval echo {1995..2022})
 echo $years
