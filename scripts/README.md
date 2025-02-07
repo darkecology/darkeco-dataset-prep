@@ -159,6 +159,6 @@ root/
 | 
 |-- README
 
-The `daily-single` directory is an intermediate data product. The `daily` directory is the final data product.
-
 ~~~
+
+Note: the `daily-single` directory is an intermediate data product. The `daily` directory is the final data product.
