@@ -132,8 +132,8 @@ root/
 |   |   |-- KENX-2016.csv
 |   |
 |   |-- 2017/
-|   |   |-- KBOX-2017.csv
-|   |   |-- KENX-2017.csv
+|       |-- KBOX-2017.csv
+|       |-- KENX-2017.csv
 |
 |-- 5min/
 |   |-- 2016/
@@ -141,8 +141,8 @@ root/
 |   |   |-- KENX-2016-5min.csv
 |   |
 |   |-- 2017/
-|   |   |-- KBOX-2017-5min.csv
-|   |   |-- KENX-2017-5min.csv
+|       |-- KBOX-2017-5min.csv
+|       |-- KENX-2017-5min.csv
 |   
 |-- daily-single/
 |   |-- 2016/
@@ -150,8 +150,8 @@ root/
 |   |   |-- KENX-2016-daily.csv
 |   |
 |   |-- 2017/
-|   |   |-- KBOX-2017-daily.csv
-|   |   |-- KENX-2017-daily.csv
+|       |-- KBOX-2017-daily.csv
+|       |-- KENX-2017-daily.csv
 |
 |-- daily/
 |   |-- 2016-daily.csv
