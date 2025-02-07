@@ -15,12 +15,10 @@ root/
 |   |-- stats
 |
 |-- file_lists/      <-- Beginning of derived data products
-|-- scan_level/   
+|-- scans/   
 |-- 5min/
+|-- daily-individual/
 |-- daily/
-|-- allstations/
-    |-- 5min/
-    |-- daily/
 ~~~~
 
 # Summary
@@ -109,6 +107,10 @@ python summarize.py --root $ROOT --stations KBOX KENX --years 2018
 
 # Step 3: Aggregate by Station
 
+~~~
+python combine_stations.py --root $ROOT --years 2018
+~~~
+
 
 # Expanded Folder Stucture
 
@@ -118,8 +120,6 @@ root/
 |-- profiles/
 |   |-- 2016
 |   |-- 2017
-|   |-- errors
-|   |-- stats
 |
 |-- file_lists/
 |   |-- station_lists/
@@ -127,32 +127,38 @@ root/
 |   |-- year_lists/
 |
 |-- scans/
-|   |-- KBOX-2016.csv
-|   |-- KBOX-2017.csv
-|   |-- KENX-2016.csv
-|   |-- KENX-2017.csv
-|   
+|   |-- 2016/
+|   |   |-- KBOX-2016.csv
+|   |   |-- KENX-2016.csv
+|   |
+|   |-- 2017/
+|   |   |-- KBOX-2017.csv
+|   |   |-- KENX-2017.csv
+|
 |-- 5min/
-|   |-- KBOX-2016-5min.csv
-|   |-- KBOX-2017-5min.csv
-|   |-- KENX-2016-5min.csv
-|   |-- KENX-2017-5min.csv
+|   |-- 2016/
+|   |   |-- KBOX-2016-5min.csv
+|   |   |-- KENX-2016-5min.csv
+|   |
+|   |-- 2017/
+|   |   |-- KBOX-2017-5min.csv
+|   |   |-- KENX-2017-5min.csv
 |   
+|-- daily-single/
+|   |-- 2016/
+|   |   |-- KBOX-2016-daily.csv
+|   |   |-- KENX-2016-daily.csv
+|   |
+|   |-- 2017/
+|   |   |-- KBOX-2017-daily.csv
+|   |   |-- KENX-2017-daily.csv
+|
 |-- daily/
-|   |-- KBOX-2016-daily.csv
-|   |-- KBOX-2017-daily.csv
-|   |-- KENX-2016-daily.csv
-|   |-- KENX-2017-daily.csv
-|
-|-- combined-5min/
-|   |-- 2016-5min.csv
-|   |-- 2017-5min.csv
-|
-|-- combined-daily/
 |   |-- 2016-daily.csv
 |   |-- 2017-daily.csv
 | 
-|-- setup.py
 |-- README
+
+The `daily-single` directory is an intermediate data product. The `daily` directory is the final data product.
 
 ~~~
