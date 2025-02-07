@@ -5,7 +5,7 @@ VERSION=${2:-1.0.0}
 
 OUT=/scratch2/darkecodata/$VERSION
 
-dirs="scans 5min daily combined-5min combined-daily"
+dirs="scans 5min daily"
 echo "root is $root"
 
 for dir in $dirs; do
