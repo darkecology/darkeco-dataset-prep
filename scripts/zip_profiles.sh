@@ -1,11 +1,11 @@
 #!/bin/bash
 
-root=${1:-/data/cajun_results/cajun-complete}
-VERSION=${2:-0.1.0}
+root=${1:-/scratch2/cajun_results/cajun_1_0}
+VERSION=${2:-1.0.0}
 
 OUT=/scratch2/cajundata/$VERSION
 
-years=$(eval echo {1995..2019})
+years=$(eval echo {1995..2022})
 echo $years
 
 mkdir -p log
