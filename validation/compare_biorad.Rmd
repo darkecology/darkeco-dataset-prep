@@ -113,7 +113,7 @@ vpts<- bind_into_vpts(vps)
 
 # add location metadata
 stations = read_csv(sprintf("%s/meta/nexrad-stations.csv", root))
-KGBM = stations[stations$callsign == "KBGM", ]
+KBGM = stations[stations$callsign == "KBGM", ]
 vpts$attributes$where$lat = KBGM$lat
 vpts$attributes$where$lon = KBGM$lon
 
