@@ -1,4 +1,4 @@
-# Cajun Data Scripts
+# Dark Ecology Dataset Preparation Scripts
 
 The scripts in this directory process cajun output and create derived
 data products.
