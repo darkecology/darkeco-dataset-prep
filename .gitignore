@@ -6,4 +6,5 @@ data
 **.idea
 **.egg-info
 **.Rhistory
+**.vscode
 validation/plots
