@@ -1,0 +1,74 @@
+{
+   "metadata" : {
+       "creators" : [
+         {
+            "affiliation" : "University of Massachusetts Amherst",
+            "name" : "Sheldon, Daniel",
+            "orcid" : "0000-0002-4257-2432"
+         },
+         {
+            "orcid" : "0000-0002-8838-8905",
+            "name" : "Winner, Kevin",
+            "affiliation" : "Yale University"
+         },
+         {
+            "name" : "Deznabi, Iman",
+            "affiliation" : "University of Massachusetts Amherst"
+         },
+         {
+            "affiliation" : "Inari Agriculture (United States)",
+            "name" : "Bernstein, Garrett"
+         },
+         {
+            "affiliation" : "CiBO Technologies",
+            "name" : "Bhambani, Pankaj"
+         },
+         {
+            "orcid" : "0000-0002-1332-646X",
+            "name" : "Lin, Tsung-Yu",
+            "affiliation" : "Meta AI"
+         },
+         {
+            "name" : "Dokter, Adriaan",
+            "orcid" : "0000-0001-6573-066X",
+            "affiliation" : "Cornell Lab of Ornithology"
+         },
+         {
+            "orcid" : "0000-0003-3243-3081",
+            "name" : "Horton, Kyle",
+            "affiliation" : "Colorado State University"
+         },
+         {
+            "affiliation" : "University of Copenhagen",
+            "name" : "Nilsson, Cecilia",
+            "orcid" : "0000-0001-8957-4411"
+         },
+         {
+            "affiliation" : "University of Illinois Urbana-Champaign",
+            "orcid" : "0000-0002-7355-6005",
+            "name" : "Van Doren, Benjamin"
+         },
+         {
+            "orcid" : "0000-0002-9854-4449",
+            "name" : "Farnsworth, Andrew",
+            "affiliation" : "Cornell Lab of Ornithology"
+         },
+         {
+            "affiliation" : "Cornell Lab of Ornithology",
+            "orcid" : "0000-0001-8521-2501",
+            "name" : "La Sorte, Frank"
+         },
+         {
+            "affiliation" : "University of Massachusetts Amherst",
+            "name" : "Maji, Subhransu",
+            "orcid" : "0000-0002-3869-9334"
+         }
+      ],
+      "title" : "Dark Ecology Dataset: Measurements of Aerial Biomass in US Weather Radar: Vertical Profiles from 1995–1999",
+      "license" : "cc-by-4.0",
+      "version" : "1.0.0",
+      "upload_type" : "dataset",
+      "description" : "<p>The US NEXRAD radar network has monitored the aerosphere over the US and its territories since the 1990s and archived over 250 million files that contain a wealth of information about the movements of birds, bats, and insects. We extracted measurements of biological activity from all files in the NEXRAD archive.</p>\n<p>This data record contains vertical profiles of aerial biomass from 1995 through 1999.</p>\n<p>Vertical profiles for other decades and aggregated data products can be found in associated data records.</p>",
+      "publication_date" : "2024-08-19"
+   }
+}

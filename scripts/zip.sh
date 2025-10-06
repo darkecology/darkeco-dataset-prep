@@ -10,6 +10,5 @@ echo "root is $root"
 
 for dir in $dirs; do
     echo "zipping $dir"
-    # note: include meta folder in each .tar.bz2 file
-    tar cvf $OUT/$dir.tar.bz2 --use-compress-program='lbzip2 -n32' -C $root $dir meta
+    tar cvf $OUT/$dir.tar.bz2 --use-compress-program='lbzip2 -n32' -C $root $dir
 done
