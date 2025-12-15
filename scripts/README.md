@@ -1,9 +1,11 @@
 # Dark Ecology Dataset Preparation Scripts
 
 The scripts in this directory process cajun output and create derived
-data products.
+data products. 
 
-By default, they use this folder structure:
+They operate in a data directory with the cajun output in one subdirectory
+and then add derived data products in other subdirectories. The folder 
+structure looks like this:
 
 ~~~ text
 root/
@@ -17,7 +19,7 @@ root/
 |-- file_lists/      <-- Beginning of derived data products
 |-- scans/   
 |-- 5min/
-|-- daily-individual/
+|-- daily-single/
 |-- daily/
 ~~~~
 
@@ -27,7 +29,6 @@ Run this sequence of commands to go from raw profiles to the prepared data set:
 
 ~~~ text
 
-#export ROOT=/data/cajun_results/cajun-complete
 export ROOT=/scratch2/cajun_results/cajun_1_0
 export VERSION=1.0.0
 
