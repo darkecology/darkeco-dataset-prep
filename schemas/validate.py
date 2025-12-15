@@ -15,7 +15,7 @@ with system.use_context(trusted=True):
     for path, schema in pairs:
         path = f"{root}/{path}"
         files = os.listdir(path)
-        for file in files[1:10]:
+        for file in files[:10]:
             if file.endswith(".csv"):
                 print(f"{file} ({schema}): ", end="")
                 report = validate(f"{path}/{file}", schema=f"json/{schema}")
