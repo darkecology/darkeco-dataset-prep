@@ -59,6 +59,24 @@ def main():
                             station_year_lists[f"{station}-{year}"].append(scan_file)
 
     os.chdir(cwd)
+
+    # Diagnostics: count totals before saving
+    station_total = sum(len(v) for v in station_lists.values())
+    year_total = sum(len(v) for v in year_lists.values())
+    station_year_total = sum(len(v) for v in station_year_lists.values())
+
+    print("\n" + "="*60)
+    print("DIAGNOSTICS")
+    print("="*60)
+    print(f"Sum of station_lists:      {station_total:,}")
+    print(f"Sum of year_lists:         {year_total:,}")
+    print(f"Sum of station_year_lists: {station_year_total:,}")
+    if station_total == year_total == station_year_total:
+        print(f"All counts match: {station_total:,}")
+    else:
+        print(f"COUNT MISMATCH!")
+    print("="*60 + "\n")
+
     save_lists(station_lists, "station_lists", meta_file_folder)
     save_lists(year_lists, "year_lists", meta_file_folder)
     save_lists(station_year_lists, "station_year_lists", meta_file_folder)
