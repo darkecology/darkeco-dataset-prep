@@ -1,6 +1,7 @@
 import argparse
 import glob
 import os
+import warnings
 
 import pandas as pd
 from tqdm import tqdm
@@ -91,6 +92,9 @@ def do_one_year(params):
 
     if args.do_daily:
         files = glob.glob(f"{root}/daily-single/{year}/????-{year}-daily.csv")
+        if not files:
+            warnings.warn(f"no daily files for {year}")
+            return
 
         key_cols = ["date", "period", "station"]
         data_cols = ["period_length", "reflectivity_hours", "u", "v", "fraction_missing", "fraction_rain"]
