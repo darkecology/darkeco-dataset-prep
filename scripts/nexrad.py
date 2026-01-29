@@ -64,6 +64,7 @@ locations = {
     "KGSP": {'lat': 34.88306,  'lon': -82.22028,   'elev': 940,    'tz': 'America/New_York'},
     "KGWX": {'lat': 33.89667,  'lon': -88.32889,   'elev': 476,    'tz': 'America/Chicago'},
     "KGYX": {'lat': 43.89139,  'lon': -70.25694,   'elev': 409,    'tz': 'America/New_York'},
+    "KHDC": {'lat': 30.5193,   'lon': -90.4074,    'elev': 43,     'tz': 'America/Chicago'},
     "KHDX": {'lat': 33.07639,  'lon': -106.12222,  'elev': 4222,   'tz': 'America/Denver'},
     "KHGX": {'lat': 29.47194,  'lon': -95.07889,   'elev': 18,     'tz': 'America/Chicago'},
     "KHNX": {'lat': 36.31417,  'lon': -119.63111,  'elev': 243,    'tz': 'America/Los_Angeles'},
