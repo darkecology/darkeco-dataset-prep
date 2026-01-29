@@ -1,7 +1,12 @@
 from frictionless import validate, Resource, system
+import argparse
 import os
 
-root = '../data'
+parser = argparse.ArgumentParser(description='Validate CSV data files against JSON schemas.')
+parser.add_argument('--data-dir', default='../data', help='Root data directory (default: ../data)')
+args = parser.parse_args()
+
+root = args.data_dir
 
 pairs = [
     ("profiles/2019/01/01/KABR", "profile.schema.json"),
