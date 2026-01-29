@@ -5,7 +5,8 @@ VERSION=${2:-1.0.0}
 
 OUT=/scratch2/darkecodata/$VERSION
 
-years=$(eval echo {1995..2022})
+#years=$(eval echo {1995..2022})
+years="2019 2023 2024 2025"
 echo $years
 
 mkdir -p log
