@@ -28,9 +28,12 @@ if [ "$VERBOSE" -eq 1 ]; then
     echo "Uploading file..."
 fi
 
+RESPONSE_FILE=$(mktemp /tmp/zenodo_response.XXXXXX)
+trap "rm -f $RESPONSE_FILE" EXIT
+
 curl --progress-bar \
     --retry 5 \
     --retry-delay 5 \
-    -o /dev/null \
+    -o "$RESPONSE_FILE" \
     --upload-file "$FILEPATH" \
     $BUCKET/"$FILENAME"?access_token="$ZENODO_TOKEN"
