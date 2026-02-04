@@ -104,7 +104,7 @@ start_date <- "2019-10-01 12:00"
 end_date <- "2019-10-16 12:00"
 
 # load vp filenames
-root = "../data-1.0.0"
+root = "../data"
 vpfiles <- list.files(sprintf("%s/profiles/2019/10", root), 
                       recursive = T, full.names = T, pattern = "KBGM") # load data
 vps <- lapply(vpfiles,read_cajun)
@@ -125,7 +125,7 @@ sd_vvp_threshold(vpts)=0
 vpi <- integrate_profile(filter_vpts(vpts, min=start_date, max=end_date))
 
 # load pre-generated vpi:
-vpi_cajun <- read_csv("../data-1.0.0/scans/2019/KBGM-2019.csv")
+vpi_cajun <- read_csv("../data/scans/2019/KBGM-2019.csv")
 #vpi_cajun <- read_csv("../data-1.0.0/5min/2019/KBGM-2019-5min.csv")
 
 # Align to common times
@@ -199,17 +199,17 @@ print(cor(vpi$dd, vpi_cajun$direction))
 print(cor(vpi$u, vpi_cajun$u))
 print(cor(vpi$v, vpi_cajun$v))
 
-rmae <- function(a, b) {
-  return (sum(abs(a-b)/a))
+mape <- function(a, b) {
+  return (100*mean(abs(a-b)/a))
 }
 
-# Show relative MAE
-print(rmae(vpi$vir, vpi_cajun$reflectivity))
-print(rmae(vpi$rtr, vpi_cajun$traffic_rate))
-print(rmae(vpi$ff, vpi_cajun$speed))
-print(rmae(vpi$dd, vpi_cajun$direction))
-print(rmae(vpi$u, vpi_cajun$u))
-print(rmae(vpi$v, vpi_cajun$v))
+# Show MAPE
+print(mape(vpi$vir, vpi_cajun$reflectivity))
+print(mape(vpi$rtr, vpi_cajun$traffic_rate))
+print(mape(vpi$ff, vpi_cajun$speed))
+print(mape(vpi$dd, vpi_cajun$direction))
+print(mape(vpi$u, vpi_cajun$u))
+print(mape(vpi$v, vpi_cajun$v))
 
 ```
 # Cajun vs. vol2bird profiles
