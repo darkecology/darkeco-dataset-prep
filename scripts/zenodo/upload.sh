@@ -47,8 +47,10 @@
 #     ./zenodo_upload.sh 13345214 /scratch2/darkecodata/1.0.0/profiles_$year.tar.bz2
 # done
 
-files="5min.tar.bz2 daily.tar.bz2 scans.tar.bz2"
+#files="daily.tar.bz2"
+files="5min.tar.bz2 scans.tar.bz2"
 for file in $files; do
     echo $file
-    ./zenodo_upload.sh 13345266 /scratch2/darkecodata/1.0.0/$file
+    # ./zenodo_upload.sh 13345266 /scratch2/darkecodata/1.0.0/$file # version 1.0.0 (1995-2022)
+    ./zenodo_upload.sh 18433334 /scratch2/darkecodata/1.0.0/$file   # version 1.1.0 (1995-2025)
 done
