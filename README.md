@@ -1,4 +1,6 @@
 # darkeco-dataset-prep
+[![DOI](https://zenodo.org/badge/243590743.svg)](https://doi.org/10.5281/zenodo.18499922)
+
 
 Data preparation for the [Dark Ecology Dataset](https://github.com/darkecology/darkeco-dataset):
 
