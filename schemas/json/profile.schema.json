@@ -28,7 +28,7 @@
         },
         {
             "name": "linear_eta",
-            "description": "Average linear reflectivity for height bin. Represents the radar cross section in <unit>cm^2</unit> per cubic kilometer of atmosphere.\n",
+            "description": "Average reflectivity for height bin. Represents the radar cross section in <unit>cm^2</unit> per cubic kilometer of atmosphere.\n",
             "type": "number",
             "unit": "cm^2.km^{-3}",
             "constraints": {
